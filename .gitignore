@@ -1,4 +1,5 @@
 .env
+__pycache__/
 ai_decisions.csv
 portfolio_state.csv
 trade_history.csv

@@ -59,6 +59,10 @@ MACD_FAST = 12
 MACD_SLOW = 26
 MACD_SIGNAL = 9
 
+# Binance fee structure (as decimals)
+MAKER_FEE_RATE = 0.0         # 0.0000%
+TAKER_FEE_RATE = 0.000275    # 0.0275%
+
 # ───────────────────────────────────────────────────────────
 
 logging.basicConfig(
@@ -219,6 +223,21 @@ def load_state() -> None:
             for coin, pos in loaded_positions.items():
                 if not isinstance(pos, dict):
                     continue
+                fees_paid_raw = pos.get("fees_paid", pos.get("entry_fee", 0.0))
+                if fees_paid_raw is None:
+                    fees_paid_value = 0.0
+                else:
+                    try:
+                        fees_paid_value = float(fees_paid_raw)
+                    except (TypeError, ValueError):
+                        fees_paid_value = 0.0
+
+                fee_rate_raw = pos.get("fee_rate", TAKER_FEE_RATE)
+                try:
+                    fee_rate_value = float(fee_rate_raw)
+                except (TypeError, ValueError):
+                    fee_rate_value = TAKER_FEE_RATE
+
                 restored_positions[coin] = {
                     "side": pos.get("side", "long"),
                     "quantity": float(pos.get("quantity", 0.0)),
@@ -229,6 +248,9 @@ def load_state() -> None:
                     "confidence": float(pos.get("confidence", 0.0)),
                     "invalidation_condition": pos.get("invalidation_condition", ""),
                     "margin": float(pos.get("margin", 0.0)),
+                    "fees_paid": fees_paid_value,
+                    "fee_rate": fee_rate_value,
+                    "liquidity": pos.get("liquidity", "taker"),
                 }
             positions = restored_positions
         logging.info(
@@ -357,14 +379,17 @@ CURRENT POSITIONS:
     
     if positions:
         for coin, pos in positions.items():
-            unrealized_pnl = calculate_unrealized_pnl(coin, market_data.get(coin, {}).get('price', 0))
+            current_price = market_data.get(coin, {}).get('price', pos['entry_price'])
+            gross_unrealized = calculate_unrealized_pnl(coin, current_price)
+            fees_paid = pos.get('fees_paid', 0.0)
+            net_unrealized = gross_unrealized - fees_paid
             prompt += f"""
 {coin}:
   - Side: {pos['side']}
   - Quantity: {pos['quantity']}
   - Entry Price: ${pos['entry_price']:.4f}
-  - Current Price: ${market_data.get(coin, {}).get('price', 0):.4f}
-  - Unrealized PnL: ${unrealized_pnl:.2f}
+  - Current Price: ${current_price:.4f}
+  - Unrealized PnL: ${net_unrealized:.2f} (gross ${gross_unrealized:.2f}, fees paid ${fees_paid:.2f})
   - Profit Target: ${pos['profit_target']:.4f}
   - Stop Loss: ${pos['stop_loss']:.4f}
   - Leverage: {pos['leverage']}x
@@ -520,12 +545,23 @@ def calculate_unrealized_pnl(coin: str, current_price: float) -> float:
     
     return pnl
 
+def calculate_net_unrealized_pnl(coin: str, current_price: float) -> float:
+    """Calculate unrealized PnL after subtracting fees already paid."""
+    gross_pnl = calculate_unrealized_pnl(coin, current_price)
+    fees_paid = positions.get(coin, {}).get('fees_paid', 0.0)
+    return gross_pnl - fees_paid
+
 def calculate_total_equity() -> float:
     """Calculate total equity (balance + unrealized PnL)."""
     total = balance
     
-    for coin in positions:
-        symbol = [s for s, c in SYMBOL_TO_COIN.items() if c == coin][0]
+    for coin, pos in positions.items():
+        symbol = next((s for s, c in SYMBOL_TO_COIN.items() if c == coin), None)
+        if not symbol:
+            continue
+        margin = pos.get('margin', 0.0)
+        total += margin
+
         data = fetch_market_data(symbol)
         if data:
             total += calculate_unrealized_pnl(coin, data['price'])
@@ -554,8 +590,24 @@ def execute_entry(coin: str, decision: Dict[str, Any], current_price: float) -> 
     position_value = quantity * current_price
     margin_required = position_value / leverage
     
-    if margin_required > balance:
-        logging.warning(f"{coin}: Insufficient balance ${balance:.2f} for margin ${margin_required:.2f}")
+    liquidity = decision.get('liquidity', 'taker').lower()
+    fee_rate = decision.get('fee_rate')
+    if fee_rate is not None:
+        try:
+            fee_rate = float(fee_rate)
+        except (TypeError, ValueError):
+            logging.warning(f"{coin}: Invalid fee_rate provided ({fee_rate}); defaulting to Binance schedule.")
+            fee_rate = None
+    if fee_rate is None:
+        fee_rate = MAKER_FEE_RATE if liquidity == 'maker' else TAKER_FEE_RATE
+    entry_fee = position_value * fee_rate
+    
+    total_cost = margin_required + entry_fee
+    if total_cost > balance:
+        logging.warning(
+            f"{coin}: Insufficient balance ${balance:.2f} for margin ${margin_required:.2f} "
+            f"and fees ${entry_fee:.2f}"
+        )
         return
     
     # Open position
@@ -568,14 +620,19 @@ def execute_entry(coin: str, decision: Dict[str, Any], current_price: float) -> 
         'leverage': leverage,
         'confidence': decision.get('confidence', 0.5),
         'invalidation_condition': decision.get('invalidation_condition', ''),
-        'margin': margin_required
+        'margin': margin_required,
+        'fees_paid': entry_fee,
+        'fee_rate': fee_rate,
+        'liquidity': liquidity
     }
     
-    balance -= margin_required
+    balance -= total_cost
     
     print(f"{Fore.GREEN}[ENTRY] {coin} {side.upper()} {quantity:.4f} @ ${current_price:.4f}")
     print(f"  ├─ Leverage: {leverage}x | Margin: ${margin_required:.2f}")
     print(f"  ├─ Target: ${decision['profit_target']:.4f} | Stop: ${decision['stop_loss']:.4f}")
+    if entry_fee > 0:
+        print(f"  ├─ Estimated Fee: ${entry_fee:.2f} ({liquidity} @ {fee_rate*100:.4f}%)")
     print(f"  └─ Confidence: {decision.get('confidence', 0)*100:.0f}%")
     
     log_trade(coin, 'ENTRY', {
@@ -587,7 +644,7 @@ def execute_entry(coin: str, decision: Dict[str, Any], current_price: float) -> 
         'leverage': leverage,
         'confidence': decision.get('confidence', 0),
         'pnl': 0,
-        'reason': decision.get('justification', 'AI entry signal')
+        'reason': f"{decision.get('justification', 'AI entry signal')} | Fees: ${entry_fee:.2f}"
     })
     save_state()
 
@@ -602,12 +659,20 @@ def execute_close(coin: str, decision: Dict[str, Any], current_price: float) -> 
     pos = positions[coin]
     pnl = calculate_unrealized_pnl(coin, current_price)
     
-    # Return margin and add PnL
-    balance += pos['margin'] + pnl
+    fee_rate = pos.get('fee_rate', TAKER_FEE_RATE)
+    exit_fee = pos['quantity'] * current_price * fee_rate
+    total_fees = pos.get('fees_paid', 0.0) + exit_fee
+    net_pnl = pnl - total_fees
     
-    color = Fore.GREEN if pnl >= 0 else Fore.RED
+    # Return margin and add net PnL (after fees)
+    balance += pos['margin'] + net_pnl
+    
+    color = Fore.GREEN if net_pnl >= 0 else Fore.RED
     print(f"{color}[CLOSE] {coin} {pos['side'].upper()} {pos['quantity']:.4f} @ ${current_price:.4f}")
-    print(f"  ├─ Entry: ${pos['entry_price']:.4f} | PnL: ${pnl:.2f}")
+    print(f"  ├─ Entry: ${pos['entry_price']:.4f} | Gross PnL: ${pnl:.2f}")
+    if total_fees > 0:
+        print(f"  ├─ Fees Paid: ${total_fees:.2f} (includes exit fee ${exit_fee:.2f})")
+    print(f"  ├─ Net PnL: ${net_pnl:.2f}")
     print(f"  └─ Balance: ${balance:.2f}")
     
     log_trade(coin, 'CLOSE', {
@@ -618,8 +683,11 @@ def execute_close(coin: str, decision: Dict[str, Any], current_price: float) -> 
         'stop_loss': 0,
         'leverage': pos['leverage'],
         'confidence': 0,
-        'pnl': pnl,
-        'reason': decision.get('justification', 'AI close signal')
+        'pnl': net_pnl,
+        'reason': (
+            f"{decision.get('justification', 'AI close signal')} | "
+            f"Gross: ${pnl:.2f} | Fees: ${total_fees:.2f}"
+        )
     })
     
     del positions[coin]
@@ -714,9 +782,15 @@ def main() -> None:
                         execute_close(coin, decision, current_price)
                     elif signal == 'hold':
                         if coin in positions:
-                            unrealized_pnl = calculate_unrealized_pnl(coin, current_price)
-                            pnl_color = Fore.GREEN if unrealized_pnl >= 0 else Fore.RED
-                            print(f"[HOLD] {coin} - Unrealized PnL: {pnl_color}${unrealized_pnl:.2f}{Style.RESET_ALL}")
+                            gross_unrealized = calculate_unrealized_pnl(coin, current_price)
+                            fees_paid = positions[coin].get('fees_paid', 0.0)
+                            net_unrealized = gross_unrealized - fees_paid
+                            pnl_color = Fore.GREEN if net_unrealized >= 0 else Fore.RED
+                            fee_note = f" (Gross: ${gross_unrealized:.2f}, Fees: ${fees_paid:.2f})" if fees_paid else ""
+                            print(
+                                f"[HOLD] {coin} - Net Unrealized PnL: "
+                                f"{pnl_color}${net_unrealized:.2f}{Style.RESET_ALL}{fee_note}"
+                            )
             
             # Display portfolio summary
             total_equity = calculate_total_equity()
