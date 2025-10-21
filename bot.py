@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import requests
+from requests.exceptions import RequestException, Timeout
 from binance.client import Client
 from dotenv import load_dotenv
 from colorama import Fore, Style, init as colorama_init
@@ -87,7 +88,44 @@ if OPENROUTER_API_KEY:
 else:
     logging.error("OPENROUTER_API_KEY not found; please check your .env file.")
 
-client = Client(API_KEY, API_SECRET, testnet=False)
+client: Optional[Client] = None
+
+def get_binance_client() -> Optional[Client]:
+    """Return a connected Binance client or None if initialization failed."""
+    global client
+
+    if client is not None:
+        return client
+
+    if not API_KEY or not API_SECRET:
+        logging.error("BN_API_KEY and/or BN_SECRET missing; unable to initialize Binance client.")
+        return None
+
+    try:
+        logging.info("Attempting to initialize Binance client...")
+        client = Client(API_KEY, API_SECRET, testnet=False)
+        logging.info("Binance client initialized successfully.")
+    except Timeout as exc:
+        logging.warning(
+            "Timed out while connecting to Binance API: %s. Will retry automatically without exiting.",
+            exc,
+        )
+        client = None
+    except RequestException as exc:
+        logging.error(
+            "Network error while connecting to Binance API: %s. Will retry automatically.",
+            exc,
+        )
+        client = None
+    except Exception as exc:
+        logging.error(
+            "Unexpected error while initializing Binance client: %s",
+            exc,
+            exc_info=True,
+        )
+        client = None
+
+    return client
 
 # ──────────────────────── GLOBAL STATE ─────────────────────
 balance: float = START_CAPITAL
@@ -346,9 +384,14 @@ def calculate_indicators(df: pd.DataFrame) -> pd.Series:
 
 def fetch_market_data(symbol: str) -> Optional[Dict[str, Any]]:
     """Fetch current market data for a symbol."""
+    binance_client = get_binance_client()
+    if not binance_client:
+        logging.warning("Skipping market data fetch for %s: Binance client unavailable.", symbol)
+        return None
+
     try:
         # Get recent klines
-        klines = client.get_klines(symbol=symbol, interval=INTERVAL, limit=50)
+        klines = binance_client.get_klines(symbol=symbol, interval=INTERVAL, limit=50)
         
         df = pd.DataFrame(klines, columns=[
             'timestamp', 'open', 'high', 'low', 'close', 'volume',
@@ -364,7 +407,7 @@ def fetch_market_data(symbol: str) -> Optional[Dict[str, Any]]:
         
         # Get funding rate for perpetual futures
         try:
-            funding_info = client.futures_funding_rate(symbol=symbol, limit=1)
+            funding_info = binance_client.futures_funding_rate(symbol=symbol, limit=1)
             funding_rate = float(funding_info[0]['fundingRate']) if funding_info else 0
         except:
             funding_rate = 0
@@ -772,6 +815,16 @@ def main() -> None:
     while True:
         try:
             iteration += 1
+
+            if not get_binance_client():
+                retry_delay = min(CHECK_INTERVAL, 60)
+                logging.warning(
+                    "Binance client unavailable; retrying in %d seconds without exiting.",
+                    retry_delay,
+                )
+                time.sleep(retry_delay)
+                continue
+
             print(f"\n{Fore.CYAN}{'='*60}")
             print(f"{Fore.CYAN}Iteration {iteration} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"{Fore.CYAN}{'='*60}\n")
