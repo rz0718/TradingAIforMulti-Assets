@@ -161,26 +161,6 @@ def init_csv_files() -> None:
         with open(STATE_CSV, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(STATE_COLUMNS)
-    else:
-        try:
-            state_df = pd.read_csv(STATE_CSV)
-        except Exception as exc:
-            logging.error("Unable to read %s for migration: %s", STATE_CSV, exc)
-        else:
-            updated = False
-            for column in STATE_COLUMNS:
-                if column not in state_df.columns:
-                    updated = True
-                    if column in {'total_margin', 'net_unrealized_pnl'}:
-                        state_df[column] = 0.0
-                    else:
-                        state_df[column] = ""
-            if updated or list(state_df.columns) != STATE_COLUMNS:
-                for column in STATE_COLUMNS:
-                    if column in {'total_margin', 'net_unrealized_pnl'}:
-                        state_df[column] = pd.to_numeric(state_df[column], errors='coerce').fillna(0.0)
-                state_df = state_df.reindex(columns=STATE_COLUMNS)
-                state_df.to_csv(STATE_CSV, index=False)
     
     if not TRADES_CSV.exists():
         with open(TRADES_CSV, 'w', newline='') as f:

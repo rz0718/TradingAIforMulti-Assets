@@ -57,4 +57,5 @@ Then open <http://localhost:8501> to access the UI.
 
 - The Docker image sets `PYTHONDONTWRITEBYTECODE=1` and `PYTHONUNBUFFERED=1` for cleaner logging.
 - When running locally without Docker, the bot still writes to the `data/` directory next to the source tree (or to `TRADEBOT_DATA_DIR` if set).
+- Existing files inside `data/` are never overwritten automatically; if headers or columns change, migrate the files manually.
 - The repository already includes sample CSV files in `data/` so you can explore the dashboard immediately. These files will be overwritten as the bot runs.
