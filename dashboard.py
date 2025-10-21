@@ -16,11 +16,14 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO)
 
 BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path(os.getenv("TRADEBOT_DATA_DIR", str(DEFAULT_DATA_DIR))).expanduser()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-STATE_CSV = BASE_DIR / "portfolio_state.csv"
-TRADES_CSV = BASE_DIR / "trade_history.csv"
-DECISIONS_CSV = BASE_DIR / "ai_decisions.csv"
-MESSAGES_CSV = BASE_DIR / "ai_messages.csv"
+STATE_CSV = DATA_DIR / "portfolio_state.csv"
+TRADES_CSV = DATA_DIR / "trade_history.csv"
+DECISIONS_CSV = DATA_DIR / "ai_decisions.csv"
+MESSAGES_CSV = DATA_DIR / "ai_messages.csv"
 ENV_PATH = BASE_DIR / ".env"
 
 COIN_TO_SYMBOL: Dict[str, str] = {

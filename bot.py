@@ -33,6 +33,10 @@ if DOTENV_PATH.exists():
 else:
     dotenv_loaded = load_dotenv(override=True)
 
+DEFAULT_DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path(os.getenv("TRADEBOT_DATA_DIR", str(DEFAULT_DATA_DIR))).expanduser()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
 # ───────────────────────── CONFIG ─────────────────────────
 API_KEY = os.getenv("BN_API_KEY", "")
 API_SECRET = os.getenv("BN_SECRET", "")
@@ -133,11 +137,11 @@ positions: Dict[str, Dict[str, Any]] = {}  # coin -> position info
 trade_history: List[Dict[str, Any]] = []
 
 # CSV files
-STATE_CSV = "portfolio_state.csv"
-STATE_JSON = "portfolio_state.json"
-TRADES_CSV = "trade_history.csv"
-DECISIONS_CSV = "ai_decisions.csv"
-MESSAGES_CSV = "ai_messages.csv"
+STATE_CSV = DATA_DIR / "portfolio_state.csv"
+STATE_JSON = DATA_DIR / "portfolio_state.json"
+TRADES_CSV = DATA_DIR / "trade_history.csv"
+DECISIONS_CSV = DATA_DIR / "ai_decisions.csv"
+MESSAGES_CSV = DATA_DIR / "ai_messages.csv"
 STATE_COLUMNS = [
     'timestamp',
     'total_balance',
@@ -153,7 +157,7 @@ STATE_COLUMNS = [
 
 def init_csv_files() -> None:
     """Initialize CSV files with headers."""
-    if not os.path.exists(STATE_CSV):
+    if not STATE_CSV.exists():
         with open(STATE_CSV, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(STATE_COLUMNS)
@@ -178,7 +182,7 @@ def init_csv_files() -> None:
                 state_df = state_df.reindex(columns=STATE_COLUMNS)
                 state_df.to_csv(STATE_CSV, index=False)
     
-    if not os.path.exists(TRADES_CSV):
+    if not TRADES_CSV.exists():
         with open(TRADES_CSV, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([
@@ -187,14 +191,14 @@ def init_csv_files() -> None:
                 'pnl', 'balance_after', 'reason'
             ])
     
-    if not os.path.exists(DECISIONS_CSV):
+    if not DECISIONS_CSV.exists():
         with open(DECISIONS_CSV, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([
                 'timestamp', 'coin', 'signal', 'reasoning', 'confidence'
             ])
 
-    if not os.path.exists(MESSAGES_CSV):
+    if not MESSAGES_CSV.exists():
         with open(MESSAGES_CSV, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([
@@ -277,7 +281,7 @@ def load_state() -> None:
     """Load persisted balance and positions if available."""
     global balance, positions
 
-    if not os.path.exists(STATE_JSON):
+    if not STATE_JSON.exists():
         logging.info("No existing state file found; starting fresh.")
         return
 
