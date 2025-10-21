@@ -100,6 +100,16 @@ STATE_JSON = "portfolio_state.json"
 TRADES_CSV = "trade_history.csv"
 DECISIONS_CSV = "ai_decisions.csv"
 MESSAGES_CSV = "ai_messages.csv"
+STATE_COLUMNS = [
+    'timestamp',
+    'total_balance',
+    'total_equity',
+    'total_return_pct',
+    'num_positions',
+    'position_details',
+    'total_margin',
+    'net_unrealized_pnl'
+]
 
 # ───────────────────────── CSV LOGGING ──────────────────────
 
@@ -108,10 +118,27 @@ def init_csv_files() -> None:
     if not os.path.exists(STATE_CSV):
         with open(STATE_CSV, 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([
-                'timestamp', 'total_balance', 'total_equity', 'total_return_pct',
-                'num_positions', 'position_details'
-            ])
+            writer.writerow(STATE_COLUMNS)
+    else:
+        try:
+            state_df = pd.read_csv(STATE_CSV)
+        except Exception as exc:
+            logging.error("Unable to read %s for migration: %s", STATE_CSV, exc)
+        else:
+            updated = False
+            for column in STATE_COLUMNS:
+                if column not in state_df.columns:
+                    updated = True
+                    if column in {'total_margin', 'net_unrealized_pnl'}:
+                        state_df[column] = 0.0
+                    else:
+                        state_df[column] = ""
+            if updated or list(state_df.columns) != STATE_COLUMNS:
+                for column in STATE_COLUMNS:
+                    if column in {'total_margin', 'net_unrealized_pnl'}:
+                        state_df[column] = pd.to_numeric(state_df[column], errors='coerce').fillna(0.0)
+                state_df = state_df.reindex(columns=STATE_COLUMNS)
+                state_df.to_csv(STATE_CSV, index=False)
     
     if not os.path.exists(TRADES_CSV):
         with open(TRADES_CSV, 'w', newline='') as f:
@@ -140,6 +167,8 @@ def log_portfolio_state() -> None:
     """Log current portfolio state."""
     total_equity = calculate_total_equity()
     total_return = ((total_equity - START_CAPITAL) / START_CAPITAL) * 100
+    total_margin = calculate_total_margin()
+    net_unrealized = total_equity - balance - total_margin
     
     position_details = "; ".join([
         f"{coin}:{pos['side']}:{pos['quantity']:.4f}@{pos['entry_price']:.4f}"
@@ -154,7 +183,9 @@ def log_portfolio_state() -> None:
             f"{total_equity:.2f}",
             f"{total_return:.2f}",
             len(positions),
-            position_details
+            position_details,
+            f"{total_margin:.2f}",
+            f"{net_unrealized:.2f}"
         ])
 
 def log_trade(coin: str, action: str, details: Dict[str, Any]) -> None:
@@ -365,12 +396,16 @@ def format_prompt_for_deepseek() -> str:
     # Calculate total equity
     total_equity = calculate_total_equity()
     total_return = ((total_equity - START_CAPITAL) / START_CAPITAL) * 100
+    total_margin = calculate_total_margin()
+    net_unrealized_total = total_equity - balance - total_margin
     
     prompt = f"""You are a cryptocurrency trading AI. Analyze the current market data and portfolio state, then provide trading decisions.
 
 CURRENT PORTFOLIO STATE:
 - Available Cash: ${balance:.2f}
+- Margin Allocated: ${total_margin:.2f}
 - Total Equity: ${total_equity:.2f}
+- Unrealized PnL: ${net_unrealized_total:.2f}
 - Total Return: {total_return:.2f}%
 - Number of Positions: {len(positions)}
 
@@ -551,17 +586,18 @@ def calculate_net_unrealized_pnl(coin: str, current_price: float) -> float:
     fees_paid = positions.get(coin, {}).get('fees_paid', 0.0)
     return gross_pnl - fees_paid
 
+def calculate_total_margin() -> float:
+    """Return sum of margin allocated across all open positions."""
+    return sum(float(pos.get('margin', 0.0)) for pos in positions.values())
+
 def calculate_total_equity() -> float:
     """Calculate total equity (balance + unrealized PnL)."""
-    total = balance
+    total = balance + calculate_total_margin()
     
-    for coin, pos in positions.items():
+    for coin in positions:
         symbol = next((s for s, c in SYMBOL_TO_COIN.items() if c == coin), None)
         if not symbol:
             continue
-        margin = pos.get('margin', 0.0)
-        total += margin
-
         data = fetch_market_data(symbol)
         if data:
             total += calculate_unrealized_pnl(coin, data['price'])
@@ -796,12 +832,18 @@ def main() -> None:
             total_equity = calculate_total_equity()
             total_return = ((total_equity - START_CAPITAL) / START_CAPITAL) * 100
             equity_color = Fore.GREEN if total_return >= 0 else Fore.RED
+            total_margin = calculate_total_margin()
+            net_unrealized_total = total_equity - balance - total_margin
+            net_color = Fore.GREEN if net_unrealized_total >= 0 else Fore.RED
             
             print(f"\n{Fore.YELLOW}{'─'*60}")
             print(f"{Fore.YELLOW}PORTFOLIO SUMMARY")
             print(f"{Fore.YELLOW}{'─'*60}")
             print(f"Available Balance: ${balance:.2f}")
+            if total_margin > 0:
+                print(f"Margin Allocated: ${total_margin:.2f}")
             print(f"Total Equity: {equity_color}${total_equity:.2f} ({total_return:+.2f}%){Style.RESET_ALL}")
+            print(f"Unrealized PnL: {net_color}${net_unrealized_total:.2f}{Style.RESET_ALL}")
             print(f"Open Positions: {len(positions)}")
             print(f"{Fore.YELLOW}{'─'*60}\n")
             

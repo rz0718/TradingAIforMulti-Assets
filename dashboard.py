@@ -63,7 +63,14 @@ def get_portfolio_state() -> pd.DataFrame:
     if df.empty:
         return df
 
-    numeric_cols = ["total_balance", "total_equity", "total_return_pct", "num_positions"]
+    numeric_cols = [
+        "total_balance",
+        "total_equity",
+        "total_return_pct",
+        "num_positions",
+        "total_margin",
+        "net_unrealized_pnl",
+    ]
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -205,11 +212,24 @@ def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> Non
         return
 
     latest = state_df.iloc[-1]
-    unrealized_pnl = latest["total_equity"] - latest["total_balance"]
+    margin_allocated = latest.get("total_margin", 0.0)
+    if pd.isna(margin_allocated):
+        margin_allocated = 0.0
+    margin_allocated = float(margin_allocated)
+    unrealized_pnl = latest.get("net_unrealized_pnl", np.nan)
+    if pd.isna(unrealized_pnl):
+        unrealized_pnl = latest["total_equity"] - latest["total_balance"] - margin_allocated
+
     prev_unrealized = 0.0
     if len(state_df) > 1:
         prior = state_df.iloc[-2]
-        prev_unrealized = prior["total_equity"] - prior["total_balance"]
+        prev_margin = prior.get("total_margin", 0.0)
+        if pd.isna(prev_margin):
+            prev_margin = 0.0
+        prev_margin = float(prev_margin)
+        prev_unrealized = prior.get("net_unrealized_pnl", np.nan)
+        if pd.isna(prev_unrealized):
+            prev_unrealized = prior["total_equity"] - prior["total_balance"] - prev_margin
 
     realized_pnl = 0.0
     if not trades_df.empty and "action" in trades_df.columns and "pnl" in trades_df.columns:
@@ -220,17 +240,18 @@ def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> Non
 
     sharpe_ratio = compute_sharpe_ratio(trades_df)
 
-    col_a, col_b, col_c, col_d, col_e, col_f = st.columns(6)
+    col_a, col_b, col_c, col_d, col_e, col_f, col_g = st.columns(7)
     col_a.metric("Available Balance", f"${latest['total_balance']:.2f}")
     col_b.metric("Total Equity", f"${latest['total_equity']:.2f}")
     col_c.metric("Total Return %", f"{latest['total_return_pct']:.2f}%")
-    col_d.metric(
+    col_d.metric("Margin Allocated", f"${margin_allocated:.2f}")
+    col_e.metric(
         "Unrealized PnL",
         f"${unrealized_pnl:.2f}",
         delta=f"${unrealized_pnl - prev_unrealized:.2f}",
     )
-    col_e.metric("Realized PnL", f"${realized_pnl:.2f}")
-    col_f.metric(
+    col_f.metric("Realized PnL", f"${realized_pnl:.2f}")
+    col_g.metric(
         "Sharpe Ratio",
         f"{sharpe_ratio:.2f}" if sharpe_ratio is not None else "N/A",
     )
