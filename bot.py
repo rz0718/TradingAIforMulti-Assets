@@ -13,6 +13,7 @@ import csv
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from decimal import Decimal
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -22,7 +23,14 @@ from dotenv import load_dotenv
 from colorama import Fore, Style, init as colorama_init
 
 colorama_init(autoreset=True)
-load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent
+DOTENV_PATH = BASE_DIR / ".env"
+
+if DOTENV_PATH.exists():
+    dotenv_loaded = load_dotenv(dotenv_path=DOTENV_PATH, override=True)
+else:
+    dotenv_loaded = load_dotenv(override=True)
 
 # ───────────────────────── CONFIG ─────────────────────────
 API_KEY = os.getenv("BN_API_KEY", "")
@@ -58,6 +66,23 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+if not dotenv_loaded:
+    logging.warning(f"No .env file found at {DOTENV_PATH}; falling back to system environment variables.")
+
+if OPENROUTER_API_KEY:
+    masked_key = (
+        OPENROUTER_API_KEY
+        if len(OPENROUTER_API_KEY) <= 12
+        else f"{OPENROUTER_API_KEY[:6]}...{OPENROUTER_API_KEY[-4:]}"
+    )
+    logging.info(
+        "OpenRouter API key detected: %s (length %d)",
+        masked_key,
+        len(OPENROUTER_API_KEY),
+    )
+else:
+    logging.error("OPENROUTER_API_KEY not found; please check your .env file.")
+
 client = Client(API_KEY, API_SECRET, testnet=False)
 
 # ──────────────────────── GLOBAL STATE ─────────────────────
@@ -67,8 +92,10 @@ trade_history: List[Dict[str, Any]] = []
 
 # CSV files
 STATE_CSV = "portfolio_state.csv"
+STATE_JSON = "portfolio_state.json"
 TRADES_CSV = "trade_history.csv"
 DECISIONS_CSV = "ai_decisions.csv"
+MESSAGES_CSV = "ai_messages.csv"
 
 # ───────────────────────── CSV LOGGING ──────────────────────
 
@@ -96,6 +123,13 @@ def init_csv_files() -> None:
             writer = csv.writer(f)
             writer.writerow([
                 'timestamp', 'coin', 'signal', 'reasoning', 'confidence'
+            ])
+
+    if not os.path.exists(MESSAGES_CSV):
+        with open(MESSAGES_CSV, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                'timestamp', 'direction', 'role', 'content', 'metadata'
             ])
 
 def log_portfolio_state() -> None:
@@ -150,6 +184,79 @@ def log_ai_decision(coin: str, signal: str, reasoning: str, confidence: float) -
             reasoning,
             confidence
         ])
+
+
+def log_ai_message(direction: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    """Log raw messages exchanged with the AI provider."""
+    with open(MESSAGES_CSV, 'a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            datetime.now().isoformat(),
+            direction,
+            role,
+            content,
+            json.dumps(metadata) if metadata else ""
+        ])
+
+# ───────────────────────── STATE MGMT ───────────────────────
+
+def load_state() -> None:
+    """Load persisted balance and positions if available."""
+    global balance, positions
+
+    if not os.path.exists(STATE_JSON):
+        logging.info("No existing state file found; starting fresh.")
+        return
+
+    try:
+        with open(STATE_JSON, "r") as f:
+            data = json.load(f)
+
+        balance = float(data.get("balance", START_CAPITAL))
+        loaded_positions = data.get("positions", {})
+        if isinstance(loaded_positions, dict):
+            restored_positions: Dict[str, Dict[str, Any]] = {}
+            for coin, pos in loaded_positions.items():
+                if not isinstance(pos, dict):
+                    continue
+                restored_positions[coin] = {
+                    "side": pos.get("side", "long"),
+                    "quantity": float(pos.get("quantity", 0.0)),
+                    "entry_price": float(pos.get("entry_price", 0.0)),
+                    "profit_target": float(pos.get("profit_target", 0.0)),
+                    "stop_loss": float(pos.get("stop_loss", 0.0)),
+                    "leverage": float(pos.get("leverage", 1)),
+                    "confidence": float(pos.get("confidence", 0.0)),
+                    "invalidation_condition": pos.get("invalidation_condition", ""),
+                    "margin": float(pos.get("margin", 0.0)),
+                }
+            positions = restored_positions
+        logging.info(
+            "Loaded state from %s (balance: %.2f, positions: %d)",
+            STATE_JSON,
+            balance,
+            len(positions),
+        )
+    except Exception as e:
+        logging.error("Failed to load state from %s: %s", STATE_JSON, e, exc_info=True)
+        balance = START_CAPITAL
+        positions = {}
+
+def save_state() -> None:
+    """Persist current balance and open positions."""
+    try:
+        with open(STATE_JSON, "w") as f:
+            json.dump(
+                {
+                    "balance": balance,
+                    "positions": positions,
+                    "updated_at": datetime.now().isoformat(),
+                },
+                f,
+                indent=2,
+            )
+    except Exception as e:
+        logging.error("Failed to save state to %s: %s", STATE_JSON, e, exc_info=True)
 
 # ───────────────────────── INDICATORS ───────────────────────
 
@@ -314,6 +421,17 @@ IMPORTANT:
 def call_deepseek_api(prompt: str) -> Optional[Dict[str, Any]]:
     """Call OpenRouter API with DeepSeek Chat V3.1."""
     try:
+        log_ai_message(
+            direction="sent",
+            role="user",
+            content=prompt,
+            metadata={
+                "model": "deepseek/deepseek-chat-v3.1",
+                "temperature": 0.7,
+                "max_tokens": 4000
+            }
+        )
+
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
@@ -335,14 +453,31 @@ def call_deepseek_api(prompt: str) -> Optional[Dict[str, Any]]:
             },
             timeout=30
         )
-        
+
         if response.status_code != 200:
             logging.error(f"OpenRouter API error: {response.status_code} - {response.text}")
+            log_ai_message(
+                direction="received",
+                role="system",
+                content=response.text,
+                metadata={"status_code": response.status_code}
+            )
             return None
-        
+
         result = response.json()
         content = result['choices'][0]['message']['content']
-        
+
+        log_ai_message(
+            direction="received",
+            role="assistant",
+            content=content,
+            metadata={
+                "status_code": response.status_code,
+                "response_id": result.get("id"),
+                "usage": result.get("usage")
+            }
+        )
+
         # Extract JSON from response (in case there's extra text)
         start = content.find('{')
         end = content.rfind('}') + 1
@@ -352,10 +487,22 @@ def call_deepseek_api(prompt: str) -> Optional[Dict[str, Any]]:
             return decisions
         else:
             logging.error("No JSON found in response")
+            log_ai_message(
+                direction="error",
+                role="system",
+                content="No JSON found in response",
+                metadata={"response_id": result.get("id")}
+            )
             return None
             
     except Exception as e:
-        logging.error(f"Error calling DeepSeek API: {e}")
+        logging.error(f"Error calling DeepSeek API: {e}", exc_info=True)
+        log_ai_message(
+            direction="error",
+            role="system",
+            content=str(e),
+            metadata={"context": "call_deepseek_api"}
+        )
         return None
 
 # ───────────────────── POSITION MANAGEMENT ──────────────────
@@ -442,6 +589,7 @@ def execute_entry(coin: str, decision: Dict[str, Any], current_price: float) -> 
         'pnl': 0,
         'reason': decision.get('justification', 'AI entry signal')
     })
+    save_state()
 
 def execute_close(coin: str, decision: Dict[str, Any], current_price: float) -> None:
     """Execute close trade."""
@@ -475,6 +623,7 @@ def execute_close(coin: str, decision: Dict[str, Any], current_price: float) -> 
     })
     
     del positions[coin]
+    save_state()
 
 def check_stop_loss_take_profit() -> None:
     """Check and execute stop loss / take profit for all positions."""
@@ -505,6 +654,7 @@ def main() -> None:
     """Main trading loop."""
     logging.info("Initializing DeepSeek Multi-Asset Paper Trading Bot...")
     init_csv_files()
+    load_state()
     
     if not OPENROUTER_API_KEY:
         logging.error("OPENROUTER_API_KEY not found in .env file")
@@ -590,9 +740,11 @@ def main() -> None:
             
         except KeyboardInterrupt:
             print("\n\nShutting down bot...")
+            save_state()
             break
         except Exception as e:
             logging.error(f"Error in main loop: {e}", exc_info=True)
+            save_state()
             time.sleep(60)
 
 if __name__ == "__main__":
