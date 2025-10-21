@@ -1,6 +1,8 @@
 # DeepSeek Paper Trading Bot
 
-This repository contains a paper-trading bot that runs against the Binance REST API while leveraging DeepSeek for trade decision-making. The app persists its runtime data (portfolio state, AI messages, and trade history) inside a dedicated `data/` directory so it can be mounted as a volume when running in Docker.
+This repository contains a paper-trading bot that runs against the Binance REST API while leveraging DeepSeek for trade decision-making. Inspired by the https://nof1.ai/ challenge. 
+
+The app persists its runtime data (portfolio state, AI messages, and trade history) inside a dedicated `data/` directory so it can be mounted as a volume when running in Docker.
 
 ## Prerequisites
 
