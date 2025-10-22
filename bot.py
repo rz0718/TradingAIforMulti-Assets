@@ -1203,13 +1203,13 @@ def main() -> None:
                 time.sleep(retry_delay)
                 continue
 
-            line = f"\n{Fore.CYAN}{'='*60}"
+            line = f"\n{Fore.CYAN}{'='*20}"
             print(line)
             record_iteration_message(line)
             line = f"{Fore.CYAN}Iteration {iteration} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             print(line)
             record_iteration_message(line)
-            line = f"{Fore.CYAN}{'='*60}\n"
+            line = f"{Fore.CYAN}{'='*20}\n"
             print(line)
             record_iteration_message(line)
             
@@ -1275,13 +1275,13 @@ def main() -> None:
             net_unrealized_total = total_equity - balance - total_margin
             net_color = Fore.GREEN if net_unrealized_total >= 0 else Fore.RED
             
-            line = f"\n{Fore.YELLOW}{'─'*60}"
+            line = f"\n{Fore.YELLOW}{'─'*20}"
             print(line)
             record_iteration_message(line)
             line = f"{Fore.YELLOW}PORTFOLIO SUMMARY"
             print(line)
             record_iteration_message(line)
-            line = f"{Fore.YELLOW}{'─'*60}"
+            line = f"{Fore.YELLOW}{'─'*20}"
             print(line)
             record_iteration_message(line)
             line = f"Available Balance: ${balance:.2f}"
@@ -1300,7 +1300,7 @@ def main() -> None:
             line = f"Open Positions: {len(positions)}"
             print(line)
             record_iteration_message(line)
-            line = f"{Fore.YELLOW}{'─'*60}\n"
+            line = f"{Fore.YELLOW}{'─'*20}\n"
             print(line)
             record_iteration_message(line)
 
