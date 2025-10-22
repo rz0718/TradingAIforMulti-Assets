@@ -1059,20 +1059,42 @@ def execute_entry(coin: str, decision: Dict[str, Any], current_price: float) -> 
     
     balance -= total_cost
     
-    line = f"{Fore.GREEN}[ENTRY] {coin} {side.upper()} {quantity:.4f} @ ${current_price:.4f}"
+    entry_price = current_price
+    target_price = decision['profit_target']
+    stop_price = decision['stop_loss']
+    is_long = side.lower() == 'long'
+
+    reward_per_unit = (target_price - entry_price) if is_long else (entry_price - target_price)
+    risk_per_unit = (entry_price - stop_price) if is_long else (stop_price - entry_price)
+    expected_reward = max(reward_per_unit * quantity, 0.0)
+    expected_risk = max(risk_per_unit * quantity, 0.0)
+    if expected_risk > 0:
+        rr_value = expected_reward / expected_risk if expected_reward > 0 else 0.0
+        rr_display = f"{rr_value:.2f}:1"
+    else:
+        rr_display = "n/a"
+
+    line = f"{Fore.GREEN}[ENTRY] {coin} {side.upper()} {quantity:.4f} @ ${entry_price:.4f}"
     print(line)
     record_iteration_message(line)
     line = f"  ├─ Leverage: {leverage}x | Margin: ${margin_required:.2f}"
     print(line)
     record_iteration_message(line)
-    line = f"  ├─ Target: ${decision['profit_target']:.4f} | Stop: ${decision['stop_loss']:.4f}"
+    line = f"  ├─ Target: ${target_price:.4f} | Stop: ${stop_price:.4f}"
     print(line)
     record_iteration_message(line)
+    if expected_reward > 0 or expected_risk > 0:
+        line = f"  ├─ PnL @ Target: +${expected_reward:.2f} | PnL @ Stop: -${expected_risk:.2f}"
+        print(line)
+        record_iteration_message(line)
     if entry_fee > 0:
         line = f"  ├─ Estimated Fee: ${entry_fee:.2f} ({liquidity} @ {fee_rate*100:.4f}%)"
         print(line)
         record_iteration_message(line)
-    line = f"  └─ Confidence: {decision.get('confidence', 0)*100:.0f}%"
+    line = f"  ├─ Confidence: {decision.get('confidence', 0)*100:.0f}%"
+    print(line)
+    record_iteration_message(line)
+    line = f"  └─ Reward/Risk: {rr_display}"
     print(line)
     record_iteration_message(line)
     
