@@ -10,8 +10,8 @@ import time
 import json
 import logging
 import csv
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Iterable, List, Optional
 from decimal import Decimal
 from pathlib import Path
 
@@ -135,6 +135,8 @@ def get_binance_client() -> Optional[Client]:
 balance: float = START_CAPITAL
 positions: Dict[str, Dict[str, Any]] = {}  # coin -> position info
 trade_history: List[Dict[str, Any]] = []
+BOT_START_TIME = datetime.now(timezone.utc)
+invocation_count: int = 0
 
 # CSV files
 STATE_CSV = DATA_DIR / "portfolio_state.csv"
@@ -335,36 +337,77 @@ def save_state() -> None:
 
 # ───────────────────────── INDICATORS ───────────────────────
 
-def calculate_indicators(df: pd.DataFrame) -> pd.Series:
-    """Calculate technical indicators."""
-    close = df["close"]
+def calculate_rsi_series(close: pd.Series, period: int) -> pd.Series:
+    """Return RSI series for specified period using Wilder's smoothing."""
+    delta = close.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+    alpha = 1 / period
+    avg_gain = gain.ewm(alpha=alpha, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=alpha, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    return 100 - 100 / (1 + rs)
+
+
+def add_indicator_columns(
+    df: pd.DataFrame,
+    ema_lengths: Iterable[int] = (EMA_LEN,),
+    rsi_periods: Iterable[int] = (RSI_LEN,),
+    macd_params: Iterable[int] = (MACD_FAST, MACD_SLOW, MACD_SIGNAL),
+) -> pd.DataFrame:
+    """Return copy of df with EMA, RSI, and MACD columns added."""
+    ema_lengths = tuple(dict.fromkeys(ema_lengths))  # remove duplicates, preserve order
+    rsi_periods = tuple(dict.fromkeys(rsi_periods))
+    fast, slow, signal = macd_params
+
+    result = df.copy()
+    close = result["close"]
+
+    for span in ema_lengths:
+        result[f"ema{span}"] = close.ewm(span=span, adjust=False).mean()
+
+    for period in rsi_periods:
+        result[f"rsi{period}"] = calculate_rsi_series(close, period)
+
+    ema_fast = close.ewm(span=fast, adjust=False).mean()
+    ema_slow = close.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    result["macd"] = macd_line
+    result["macd_signal"] = macd_line.ewm(span=signal, adjust=False).mean()
+
+    return result
+
+
+def calculate_atr_series(df: pd.DataFrame, period: int) -> pd.Series:
+    """Return Average True Range series for the provided period."""
     high = df["high"]
     low = df["low"]
-    
-    # EMA
-    ema = close.ewm(span=EMA_LEN, adjust=False).mean()
-    
-    # RSI
-    delta = close.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(RSI_LEN).mean()
-    avg_loss = loss.rolling(RSI_LEN).mean()
-    rs = avg_gain / avg_loss.replace(0, np.nan)
-    rsi = 100 - 100 / (1 + rs)
-    
-    # MACD
-    ema_fast = close.ewm(span=MACD_FAST, adjust=False).mean()
-    ema_slow = close.ewm(span=MACD_SLOW, adjust=False).mean()
-    macd = ema_fast - ema_slow
-    macd_signal = macd.ewm(span=MACD_SIGNAL, adjust=False).mean()
-    
-    df["ema20"] = ema
-    df["rsi"] = rsi
-    df["macd"] = macd
-    df["macd_signal"] = macd_signal
-    
-    return df.iloc[-1]
+    close = df["close"]
+    prev_close = close.shift(1)
+
+    tr_components = pd.concat(
+        [
+            high - low,
+            (high - prev_close).abs(),
+            (low - prev_close).abs(),
+        ],
+        axis=1,
+    )
+    true_range = tr_components.max(axis=1)
+    alpha = 1 / period
+    return true_range.ewm(alpha=alpha, adjust=False).mean()
+
+
+def calculate_indicators(df: pd.DataFrame) -> pd.Series:
+    """Calculate technical indicators and return the latest row."""
+    enriched = add_indicator_columns(
+        df,
+        ema_lengths=(EMA_LEN,),
+        rsi_periods=(RSI_LEN,),
+        macd_params=(MACD_FAST, MACD_SLOW, MACD_SIGNAL),
+    )
+    enriched["rsi"] = enriched[f"rsi{RSI_LEN}"]
+    return enriched.iloc[-1]
 
 def fetch_market_data(symbol: str) -> Optional[Dict[str, Any]]:
     """Fetch current market data for a symbol."""
@@ -409,70 +452,307 @@ def fetch_market_data(symbol: str) -> Optional[Dict[str, Any]]:
         logging.error(f"Error fetching data for {symbol}: {e}")
         return None
 
+
+def round_series(values: Iterable[Any], precision: int) -> List[float]:
+    """Round numeric iterable to the given precision, skipping NaNs."""
+    rounded: List[float] = []
+    for value in values:
+        try:
+            if pd.isna(value):
+                continue
+        except TypeError:
+            # Non-numeric/NA sentinel types fall back to ValueError later
+            pass
+        try:
+            rounded.append(round(float(value), precision))
+        except (TypeError, ValueError):
+            continue
+    return rounded
+
+
+def collect_prompt_market_data(symbol: str) -> Optional[Dict[str, Any]]:
+    """Return rich market snapshot for prompt composition."""
+    binance_client = get_binance_client()
+    if not binance_client:
+        return None
+
+    try:
+        intraday_klines = binance_client.get_klines(symbol=symbol, interval=INTERVAL, limit=200)
+        df_intraday = pd.DataFrame(
+            intraday_klines,
+            columns=[
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "close_time",
+                "quote_volume",
+                "trades",
+                "taker_base",
+                "taker_quote",
+                "ignore",
+            ],
+        )
+
+        numeric_cols = ["open", "high", "low", "close", "volume"]
+        df_intraday[numeric_cols] = df_intraday[numeric_cols].astype(float)
+        df_intraday["mid_price"] = (df_intraday["high"] + df_intraday["low"]) / 2
+        df_intraday = add_indicator_columns(
+            df_intraday,
+            ema_lengths=(EMA_LEN,),
+            rsi_periods=(7, RSI_LEN),
+            macd_params=(MACD_FAST, MACD_SLOW, MACD_SIGNAL),
+        )
+
+        df_long = pd.DataFrame(
+            binance_client.get_klines(symbol=symbol, interval="4h", limit=200),
+            columns=[
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "close_time",
+                "quote_volume",
+                "trades",
+                "taker_base",
+                "taker_quote",
+                "ignore",
+            ],
+        )
+        df_long[numeric_cols] = df_long[numeric_cols].astype(float)
+        df_long = add_indicator_columns(
+            df_long,
+            ema_lengths=(20, 50),
+            rsi_periods=(14,),
+            macd_params=(MACD_FAST, MACD_SLOW, MACD_SIGNAL),
+        )
+        df_long["atr3"] = calculate_atr_series(df_long, 3)
+        df_long["atr14"] = calculate_atr_series(df_long, 14)
+
+        try:
+            oi_hist = binance_client.futures_open_interest_hist(symbol=symbol, period="5m", limit=30)
+            open_interest_values = [float(entry["sumOpenInterest"]) for entry in oi_hist]
+        except Exception as exc:
+            logging.debug("Open interest history unavailable for %s: %s", symbol, exc)
+            open_interest_values = []
+
+        try:
+            funding_hist = binance_client.futures_funding_rate(symbol=symbol, limit=30)
+            funding_rates = [float(entry["fundingRate"]) for entry in funding_hist]
+        except Exception as exc:
+            logging.debug("Funding rate history unavailable for %s: %s", symbol, exc)
+            funding_rates = []
+
+        price = float(df_intraday["close"].iloc[-1])
+        ema20 = float(df_intraday["ema20"].iloc[-1])
+        rsi7 = float(df_intraday["rsi7"].iloc[-1])
+        rsi14 = float(df_intraday["rsi14"].iloc[-1])
+        macd_value = float(df_intraday["macd"].iloc[-1])
+        funding_latest = funding_rates[-1] if funding_rates else 0.0
+
+        intraday_tail = df_intraday.tail(10)
+        long_tail = df_long.tail(10)
+
+        open_interest_latest = open_interest_values[-1] if open_interest_values else None
+        open_interest_average = (
+            float(np.mean(open_interest_values)) if open_interest_values else None
+        )
+        funding_average = float(np.mean(funding_rates)) if funding_rates else None
+
+        return {
+            "symbol": symbol,
+            "coin": SYMBOL_TO_COIN[symbol],
+            "price": price,
+            "ema20": ema20,
+            "rsi": rsi14,
+            "rsi7": rsi7,
+            "macd": macd_value,
+            "macd_signal": float(df_intraday["macd_signal"].iloc[-1]),
+            "funding_rate": funding_latest,
+            "funding_rates": funding_rates,
+            "open_interest": {
+                "latest": open_interest_latest,
+                "average": open_interest_average,
+            },
+            "intraday_series": {
+                "mid_prices": round_series(intraday_tail["mid_price"], 3),
+                "ema20": round_series(intraday_tail["ema20"], 3),
+                "macd": round_series(intraday_tail["macd"], 3),
+                "rsi7": round_series(intraday_tail["rsi7"], 3),
+                "rsi14": round_series(intraday_tail["rsi14"], 3),
+            },
+            "long_term": {
+                "ema20": float(df_long["ema20"].iloc[-1]),
+                "ema50": float(df_long["ema50"].iloc[-1]),
+                "atr3": float(df_long["atr3"].iloc[-1]),
+                "atr14": float(df_long["atr14"].iloc[-1]),
+                "current_volume": float(df_long["volume"].iloc[-1]),
+                "average_volume": float(df_long["volume"].mean()),
+                "macd": round_series(long_tail["macd"], 3),
+                "rsi14": round_series(long_tail["rsi14"], 3),
+            },
+        }
+    except Exception as exc:
+        logging.error("Failed to build market snapshot for %s: %s", symbol, exc, exc_info=True)
+        return None
+
 # ───────────────────── AI DECISION MAKING ───────────────────
 
 def format_prompt_for_deepseek() -> str:
-    """Format current portfolio state for DeepSeek."""
-    market_data = {}
+    """Compose a rich prompt resembling the original DeepSeek in-context format."""
+    global invocation_count
+    invocation_count += 1
+
+    now = datetime.now(timezone.utc)
+    minutes_running = int((now - BOT_START_TIME).total_seconds() // 60)
+
+    market_snapshots: Dict[str, Dict[str, Any]] = {}
     for symbol in SYMBOLS:
-        data = fetch_market_data(symbol)
-        if data:
-            coin = SYMBOL_TO_COIN[symbol]
-            market_data[coin] = data
-    
-    # Calculate total equity
-    total_equity = calculate_total_equity()
-    total_return = ((total_equity - START_CAPITAL) / START_CAPITAL) * 100
+        snapshot = collect_prompt_market_data(symbol)
+        if snapshot:
+            market_snapshots[snapshot["coin"]] = snapshot
+
     total_margin = calculate_total_margin()
+    total_equity = balance + total_margin
+    for coin, pos in positions.items():
+        current_price = market_snapshots.get(coin, {}).get("price", pos["entry_price"])
+        total_equity += calculate_unrealized_pnl(coin, current_price)
+
+    total_return = ((total_equity - START_CAPITAL) / START_CAPITAL) * 100 if START_CAPITAL else 0.0
     net_unrealized_total = total_equity - balance - total_margin
-    
-    prompt = f"""You are a cryptocurrency trading AI. Analyze the current market data and portfolio state, then provide trading decisions.
 
-CURRENT PORTFOLIO STATE:
-- Available Cash: ${balance:.2f}
-- Margin Allocated: ${total_margin:.2f}
-- Total Equity: ${total_equity:.2f}
-- Unrealized PnL: ${net_unrealized_total:.2f}
-- Total Return: {total_return:.2f}%
-- Number of Positions: {len(positions)}
+    def fmt(value: Optional[float], digits: int = 3) -> str:
+        if value is None:
+            return "N/A"
+        return f"{value:.{digits}f}"
 
-CURRENT POSITIONS:
-"""
-    
-    if positions:
-        for coin, pos in positions.items():
-            current_price = market_data.get(coin, {}).get('price', pos['entry_price'])
-            gross_unrealized = calculate_unrealized_pnl(coin, current_price)
-            fees_paid = pos.get('fees_paid', 0.0)
-            net_unrealized = gross_unrealized - fees_paid
-            prompt += f"""
-{coin}:
-  - Side: {pos['side']}
-  - Quantity: {pos['quantity']}
-  - Entry Price: ${pos['entry_price']:.4f}
-  - Current Price: ${current_price:.4f}
-  - Unrealized PnL: ${net_unrealized:.2f} (gross ${gross_unrealized:.2f}, fees paid ${fees_paid:.2f})
-  - Profit Target: ${pos['profit_target']:.4f}
-  - Stop Loss: ${pos['stop_loss']:.4f}
-  - Leverage: {pos['leverage']}x
-  - Invalidation: {pos['invalidation_condition']}
-"""
-    else:
-        prompt += "  No open positions\n"
-    
-    prompt += "\nCURRENT MARKET DATA:\n"
-    for coin, data in market_data.items():
-        prompt += f"""
-{coin}:
-  - Price: ${data['price']:.4f}
-  - RSI: {data['rsi']:.2f}
-  - MACD: {data['macd']:.4f}
-  - MACD Signal: {data['macd_signal']:.4f}
-  - EMA20: {data['ema20']:.4f}
-  - Funding Rate: {data['funding_rate']:.8f}
-"""
-    
-    prompt += """
+    def fmt_rate(value: Optional[float]) -> str:
+        if value is None:
+            return "N/A"
+        return f"{value:.6g}"
+
+    prompt_lines: List[str] = []
+    prompt_lines.append(
+        f"It has been {minutes_running} minutes since you started trading. "
+        f"The current time is {now.isoformat()} and you've been invoked {invocation_count} times. "
+        "Below, we are providing you with a variety of state data, price data, and predictive signals so you can discover alpha. "
+        "Below that is your current account information, value, performance, positions, etc."
+    )
+    prompt_lines.append(
+        "<p><span class=\"font-semibold\">ALL OF THE PRICE OR SIGNAL DATA BELOW IS ORDERED: OLDEST → NEWEST</span></p>"
+    )
+    prompt_lines.append(
+        "<p><span class=\"font-semibold\">Timeframes note:</span> Unless stated otherwise in a section title, intraday series are provided at "
+        "<span class=\"font-semibold\">3-minute intervals</span>. If a coin uses a different interval, it is explicitly stated in that coin’s section.</p>"
+    )
+    prompt_lines.append("<hr>")
+    prompt_lines.append(
+        "<h3 class=\"mb-2 mt-6 text-sm font-semibold text-black dark:text-zinc-400\">CURRENT MARKET STATE FOR ALL COINS</h3>"
+    )
+
+    for symbol in SYMBOLS:
+        coin = SYMBOL_TO_COIN[symbol]
+        data = market_snapshots.get(coin)
+        if not data:
+            continue
+
+        intraday = data["intraday_series"]
+        long_term = data["long_term"]
+        open_interest = data["open_interest"]
+        funding_rates = data.get("funding_rates", [])
+        funding_avg_str = fmt_rate(float(np.mean(funding_rates))) if funding_rates else "N/A"
+
+        prompt_lines.append(
+            f"<h3 class=\"mb-2 mt-6 text-sm font-semibold text-black dark:text-zinc-400\">ALL {coin} DATA</h3>"
+        )
+        prompt_lines.append(
+            f"<p>current_price = {fmt(data['price'], 3)}, current_ema20 = {fmt(data['ema20'], 3)}, "
+            f"current_macd = {fmt(data['macd'], 3)}, current_rsi (7 period) = {fmt(data['rsi7'], 3)}</p>"
+        )
+        prompt_lines.append(
+            f"<p>In addition, here is the latest {coin} open interest and funding rate for perps (the instrument you are trading):</p>"
+        )
+        prompt_lines.append(
+            f"<p>Open Interest: Latest: {fmt(open_interest.get('latest'), 2)}  Average: {fmt(open_interest.get('average'), 2)}</p>"
+        )
+        prompt_lines.append(f"<p>Funding Rate: {fmt_rate(data['funding_rate'])} (Avg: {funding_avg_str})</p>")
+        prompt_lines.append(
+            "<p><span class=\"font-semibold\">Intraday series (3-minute intervals, oldest → latest):</span></p>"
+        )
+        prompt_lines.append(f"<p>Mid prices: {json.dumps(intraday['mid_prices'])}</p>")
+        prompt_lines.append(f"<p>EMA indicators (20-period): {json.dumps(intraday['ema20'])}</p>")
+        prompt_lines.append(f"<p>MACD indicators: {json.dumps(intraday['macd'])}</p>")
+        prompt_lines.append(f"<p>RSI indicators (7-Period): {json.dumps(intraday['rsi7'])}</p>")
+        prompt_lines.append(f"<p>RSI indicators (14-Period): {json.dumps(intraday['rsi14'])}</p>")
+        prompt_lines.append("<p><span class=\"font-semibold\">Longer-term context (4-hour timeframe):</span></p>")
+        prompt_lines.append(
+            f"<p>20-Period EMA: {fmt(long_term['ema20'], 3)} vs. 50-Period EMA: {fmt(long_term['ema50'], 3)}</p>"
+        )
+        prompt_lines.append(
+            f"<p>3-Period ATR: {fmt(long_term['atr3'], 3)} vs. 14-Period ATR: {fmt(long_term['atr14'], 3)}</p>"
+        )
+        prompt_lines.append(
+            f"<p>Current Volume: {fmt(long_term['current_volume'], 3)} vs. Average Volume: {fmt(long_term['average_volume'], 3)}</p>"
+        )
+        prompt_lines.append(f"<p>MACD indicators: {json.dumps(long_term['macd'])}</p>")
+        prompt_lines.append(f"<p>RSI indicators (14-Period): {json.dumps(long_term['rsi14'])}</p>")
+        prompt_lines.append("<hr>")
+
+    prompt_lines.append(
+        "<h3 class=\"mb-2 mt-6 text-sm font-semibold text-black dark:text-zinc-400\">HERE IS YOUR ACCOUNT INFORMATION & PERFORMANCE</h3>"
+    )
+    prompt_lines.append(f"<p>Current Total Return (percent): {fmt(total_return, 2)}%</p>")
+    prompt_lines.append(f"<p>Available Cash: {fmt(balance, 2)}</p>")
+    prompt_lines.append(f"<p>Margin Allocated: {fmt(total_margin, 2)}</p>")
+    prompt_lines.append(f"<p>Unrealized PnL: {fmt(net_unrealized_total, 2)}</p>")
+    prompt_lines.append(
+        f"<p><span class=\"font-semibold\">Current Account Value:</span> {fmt(total_equity, 2)}</p>"
+    )
+    prompt_lines.append("<p>Current live positions & performance:</p>")
+
+    for coin, pos in positions.items():
+        current_price = market_snapshots.get(coin, {}).get("price", pos["entry_price"])
+        quantity = pos["quantity"]
+        gross_unrealized = calculate_unrealized_pnl(coin, current_price)
+        leverage = pos.get("leverage", 1) or 1
+        if pos["side"] == "long":
+            liquidation_price = pos["entry_price"] * max(0.0, 1 - 1 / leverage)
+        else:
+            liquidation_price = pos["entry_price"] * (1 + 1 / leverage)
+        notional_value = quantity * current_price
+        position_payload = {
+            "symbol": coin,
+            "side": pos["side"],
+            "quantity": quantity,
+            "entry_price": pos["entry_price"],
+            "current_price": current_price,
+            "liquidation_price": liquidation_price,
+            "unrealized_pnl": gross_unrealized,
+            "leverage": pos.get("leverage", 1),
+            "exit_plan": {
+                "profit_target": pos.get("profit_target"),
+                "stop_loss": pos.get("stop_loss"),
+                "invalidation_condition": pos.get("invalidation_condition"),
+            },
+            "confidence": pos.get("confidence", 0.0),
+            "risk_usd": pos.get("risk_usd"),
+            "sl_oid": pos.get("sl_oid", -1),
+            "tp_oid": pos.get("tp_oid", -1),
+            "wait_for_fill": pos.get("wait_for_fill", False),
+            "entry_oid": pos.get("entry_oid", -1),
+            "notional_usd": notional_value,
+        }
+        prompt_lines.append(f"<p>{json.dumps(position_payload)}</p>")
+
+    sharpe_ratio = 0.0
+    prompt_lines.append(f"<p>Sharpe Ratio: {fmt(sharpe_ratio, 3)}</p>")
+
+    prompt_lines.append(
+        """
 INSTRUCTIONS:
 For each coin, provide a trading decision in JSON format. You can either:
 1. "hold" - Keep current position (if you have one)
@@ -484,26 +764,26 @@ Return ONLY a valid JSON object with this structure:
   "ETH": {
     "signal": "hold|entry|close",
     "side": "long|short",  // only for entry
-    "quantity": 0.0,  // calculated by system for entry, current for hold
+    "quantity": 0.0,
     "profit_target": 0.0,
     "stop_loss": 0.0,
     "leverage": 10,
     "confidence": 0.75,
     "risk_usd": 500.0,
-    "invalidation_condition": "If price closes below X on 3-minute candle",
+    "invalidation_condition": "If price closes below X on a 3-minute candle",
     "justification": "Reason for entry/close"  // only for entry/close
-  },
-  // ... repeat for SOL, XRP, BTC, DOGE, BNB
+  }
 }
 
-IMPORTANT: 
+IMPORTANT:
 - Only suggest entries if you see strong opportunities
 - Use proper risk management
 - Provide clear invalidation conditions
 - Return ONLY valid JSON, no other text
-"""
-    
-    return prompt
+""".strip()
+    )
+
+    return "\n".join(prompt_lines)
 
 def call_deepseek_api(prompt: str) -> Optional[Dict[str, Any]]:
     """Call OpenRouter API with DeepSeek Chat V3.1."""
@@ -686,7 +966,12 @@ def execute_entry(coin: str, decision: Dict[str, Any], current_price: float) -> 
         'margin': margin_required,
         'fees_paid': entry_fee,
         'fee_rate': fee_rate,
-        'liquidity': liquidity
+        'liquidity': liquidity,
+        'risk_usd': risk_usd,
+        'wait_for_fill': decision.get('wait_for_fill', False),
+        'entry_oid': decision.get('entry_oid', -1),
+        'tp_oid': decision.get('tp_oid', -1),
+        'sl_oid': decision.get('sl_oid', -1)
     }
     
     balance -= total_cost

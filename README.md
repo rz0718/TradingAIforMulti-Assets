@@ -4,6 +4,9 @@ This repository contains a paper-trading bot that runs against the Binance REST 
 
 The app persists its runtime data (portfolio state, AI messages, and trade history) inside a dedicated `data/` directory so it can be mounted as a volume when running in Docker.
 
+## This is how it looks when running
+![DeepSeek Trading Bot Dashboard](examples/screenshot.png)
+
 ## Prerequisites
 
 - Docker 24+ (any engine capable of building Linux/AMD64 images)

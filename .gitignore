@@ -5,3 +5,4 @@ portfolio_state.csv
 trade_history.csv
 ai_messages.csv
 portfolio_state.json
+.DS_Store
