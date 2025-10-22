@@ -53,6 +53,53 @@ SYMBOL_TO_COIN = {
     "BNBUSDT": "BNB"
 }
 
+TRADING_RULES_PROMPT = """
+You are a top level crypto trader focused on multiplying the account while safeguarding capital. Always apply these core rules:
+
+Most Important Rules for Crypto Traders
+
+Capital preservation is the foundation of successful crypto trading—your primary goal is to protect what you have so you can continue trading and growing.
+
+Never Risk More Than 1-2% Per Trade
+- Treat the 1% rule as non-negotiable; never risk more than 1-2% of total capital on a single trade.
+- Survive losing streaks with enough capital to recover.
+
+Use Stop-Loss Orders on Every Trade
+- Define exit points before entering any position.
+- Stop-loss orders are mandatory safeguards against emotional decisions.
+
+Follow the Trend—Don't Fight the Market
+- Buy rising coins and sell falling ones; the market is always right.
+- Wait for confirmation before committing capital.
+
+Stay Inactive Most of the Time
+- Trade only when high-probability setups emerge.
+- Avoid overtrading; patience and discipline preserve capital.
+
+Cut Losses Quickly and Let Profits Run
+- Close losing trades decisively; exit weak performers without hesitation.
+- Let winning trades develop and grow when they show early profit.
+
+Maintain a Written Trading Plan
+- Know entry, exit, and profit targets before executing.
+- Consistently follow the plan to keep emotions in check.
+
+Control Leverage and Position Sizing
+- Use leverage responsibly; ensure even a worst-case loss stays within the 1-2% risk cap.
+- Proper sizing is central to risk management.
+
+Focus on Small Consistent Wins
+- Prioritize steady gains over chasing moonshots.
+- Incremental growth compounds reliably and is easier to manage.
+
+Think in Probabilities, Not Predictions
+- Treat trading like a probability game with positive expectancy over many trades.
+- Shift mindset from needing to be right to managing outcomes.
+
+Stay Informed but Trade Less
+- Track market-moving news but trade only when indicators align and risk-reward is favorable.
+""".strip()
+
 INTERVAL = "3m"  # 3-minute candles as per DeepSeek example
 START_CAPITAL = 10000.0
 CHECK_INTERVAL = 180  # Check every 3 minutes (when candle closes)
@@ -642,17 +689,12 @@ def format_prompt_for_deepseek() -> str:
         "Below, we are providing you with a variety of state data, price data, and predictive signals so you can discover alpha. "
         "Below that is your current account information, value, performance, positions, etc."
     )
+    prompt_lines.append("ALL PRICE OR SIGNAL SERIES BELOW ARE ORDERED OLDEST → NEWEST.")
     prompt_lines.append(
-        "<p><span class=\"font-semibold\">ALL OF THE PRICE OR SIGNAL DATA BELOW IS ORDERED: OLDEST → NEWEST</span></p>"
+        "Timeframe note: Intraday series use 3-minute intervals unless a different interval is explicitly mentioned."
     )
-    prompt_lines.append(
-        "<p><span class=\"font-semibold\">Timeframes note:</span> Unless stated otherwise in a section title, intraday series are provided at "
-        "<span class=\"font-semibold\">3-minute intervals</span>. If a coin uses a different interval, it is explicitly stated in that coin’s section.</p>"
-    )
-    prompt_lines.append("<hr>")
-    prompt_lines.append(
-        "<h3 class=\"mb-2 mt-6 text-sm font-semibold text-black dark:text-zinc-400\">CURRENT MARKET STATE FOR ALL COINS</h3>"
-    )
+    prompt_lines.append("-" * 80)
+    prompt_lines.append("CURRENT MARKET STATE FOR ALL COINS")
 
     for symbol in SYMBOLS:
         coin = SYMBOL_TO_COIN[symbol]
@@ -666,53 +708,43 @@ def format_prompt_for_deepseek() -> str:
         funding_rates = data.get("funding_rates", [])
         funding_avg_str = fmt_rate(float(np.mean(funding_rates))) if funding_rates else "N/A"
 
+        prompt_lines.append(f"{coin} MARKET SNAPSHOT")
         prompt_lines.append(
-            f"<h3 class=\"mb-2 mt-6 text-sm font-semibold text-black dark:text-zinc-400\">ALL {coin} DATA</h3>"
+            f"- Price: {fmt(data['price'], 3)}, EMA20: {fmt(data['ema20'], 3)}, MACD: {fmt(data['macd'], 3)}, RSI(7): {fmt(data['rsi7'], 3)}"
         )
         prompt_lines.append(
-            f"<p>current_price = {fmt(data['price'], 3)}, current_ema20 = {fmt(data['ema20'], 3)}, "
-            f"current_macd = {fmt(data['macd'], 3)}, current_rsi (7 period) = {fmt(data['rsi7'], 3)}</p>"
+            f"- Open Interest (latest/avg): {fmt(open_interest.get('latest'), 2)} / {fmt(open_interest.get('average'), 2)}"
         )
         prompt_lines.append(
-            f"<p>In addition, here is the latest {coin} open interest and funding rate for perps (the instrument you are trading):</p>"
+            f"- Funding Rate (latest/avg): {fmt_rate(data['funding_rate'])} / {funding_avg_str}"
+        )
+        prompt_lines.append("  Intraday series (3-minute, oldest → latest):")
+        prompt_lines.append(f"    mid_prices: {json.dumps(intraday['mid_prices'])}")
+        prompt_lines.append(f"    ema20: {json.dumps(intraday['ema20'])}")
+        prompt_lines.append(f"    macd: {json.dumps(intraday['macd'])}")
+        prompt_lines.append(f"    rsi7: {json.dumps(intraday['rsi7'])}")
+        prompt_lines.append(f"    rsi14: {json.dumps(intraday['rsi14'])}")
+        prompt_lines.append("  Longer-term context (4-hour timeframe):")
+        prompt_lines.append(
+            f"    EMA20 vs EMA50: {fmt(long_term['ema20'], 3)} / {fmt(long_term['ema50'], 3)}"
         )
         prompt_lines.append(
-            f"<p>Open Interest: Latest: {fmt(open_interest.get('latest'), 2)}  Average: {fmt(open_interest.get('average'), 2)}</p>"
-        )
-        prompt_lines.append(f"<p>Funding Rate: {fmt_rate(data['funding_rate'])} (Avg: {funding_avg_str})</p>")
-        prompt_lines.append(
-            "<p><span class=\"font-semibold\">Intraday series (3-minute intervals, oldest → latest):</span></p>"
-        )
-        prompt_lines.append(f"<p>Mid prices: {json.dumps(intraday['mid_prices'])}</p>")
-        prompt_lines.append(f"<p>EMA indicators (20-period): {json.dumps(intraday['ema20'])}</p>")
-        prompt_lines.append(f"<p>MACD indicators: {json.dumps(intraday['macd'])}</p>")
-        prompt_lines.append(f"<p>RSI indicators (7-Period): {json.dumps(intraday['rsi7'])}</p>")
-        prompt_lines.append(f"<p>RSI indicators (14-Period): {json.dumps(intraday['rsi14'])}</p>")
-        prompt_lines.append("<p><span class=\"font-semibold\">Longer-term context (4-hour timeframe):</span></p>")
-        prompt_lines.append(
-            f"<p>20-Period EMA: {fmt(long_term['ema20'], 3)} vs. 50-Period EMA: {fmt(long_term['ema50'], 3)}</p>"
+            f"    ATR3 vs ATR14: {fmt(long_term['atr3'], 3)} / {fmt(long_term['atr14'], 3)}"
         )
         prompt_lines.append(
-            f"<p>3-Period ATR: {fmt(long_term['atr3'], 3)} vs. 14-Period ATR: {fmt(long_term['atr14'], 3)}</p>"
+            f"    Volume (current/average): {fmt(long_term['current_volume'], 3)} / {fmt(long_term['average_volume'], 3)}"
         )
-        prompt_lines.append(
-            f"<p>Current Volume: {fmt(long_term['current_volume'], 3)} vs. Average Volume: {fmt(long_term['average_volume'], 3)}</p>"
-        )
-        prompt_lines.append(f"<p>MACD indicators: {json.dumps(long_term['macd'])}</p>")
-        prompt_lines.append(f"<p>RSI indicators (14-Period): {json.dumps(long_term['rsi14'])}</p>")
-        prompt_lines.append("<hr>")
+        prompt_lines.append(f"    MACD series: {json.dumps(long_term['macd'])}")
+        prompt_lines.append(f"    RSI14 series: {json.dumps(long_term['rsi14'])}")
+        prompt_lines.append("-" * 80)
 
-    prompt_lines.append(
-        "<h3 class=\"mb-2 mt-6 text-sm font-semibold text-black dark:text-zinc-400\">HERE IS YOUR ACCOUNT INFORMATION & PERFORMANCE</h3>"
-    )
-    prompt_lines.append(f"<p>Current Total Return (percent): {fmt(total_return, 2)}%</p>")
-    prompt_lines.append(f"<p>Available Cash: {fmt(balance, 2)}</p>")
-    prompt_lines.append(f"<p>Margin Allocated: {fmt(total_margin, 2)}</p>")
-    prompt_lines.append(f"<p>Unrealized PnL: {fmt(net_unrealized_total, 2)}</p>")
-    prompt_lines.append(
-        f"<p><span class=\"font-semibold\">Current Account Value:</span> {fmt(total_equity, 2)}</p>"
-    )
-    prompt_lines.append("<p>Current live positions & performance:</p>")
+    prompt_lines.append("ACCOUNT INFORMATION AND PERFORMANCE")
+    prompt_lines.append(f"- Total Return (%): {fmt(total_return, 2)}")
+    prompt_lines.append(f"- Available Cash: {fmt(balance, 2)}")
+    prompt_lines.append(f"- Margin Allocated: {fmt(total_margin, 2)}")
+    prompt_lines.append(f"- Unrealized PnL: {fmt(net_unrealized_total, 2)}")
+    prompt_lines.append(f"- Current Account Value: {fmt(total_equity, 2)}")
+    prompt_lines.append("Open positions and performance details:")
 
     for coin, pos in positions.items():
         current_price = market_snapshots.get(coin, {}).get("price", pos["entry_price"])
@@ -746,10 +778,10 @@ def format_prompt_for_deepseek() -> str:
             "entry_oid": pos.get("entry_oid", -1),
             "notional_usd": notional_value,
         }
-        prompt_lines.append(f"<p>{json.dumps(position_payload)}</p>")
+        prompt_lines.append(f"{coin} position data: {json.dumps(position_payload)}")
 
     sharpe_ratio = 0.0
-    prompt_lines.append(f"<p>Sharpe Ratio: {fmt(sharpe_ratio, 3)}</p>")
+    prompt_lines.append(f"Sharpe Ratio: {fmt(sharpe_ratio, 3)}")
 
     prompt_lines.append(
         """
@@ -790,6 +822,16 @@ def call_deepseek_api(prompt: str) -> Optional[Dict[str, Any]]:
     try:
         log_ai_message(
             direction="sent",
+            role="system",
+            content=TRADING_RULES_PROMPT,
+            metadata={
+                "model": "deepseek/deepseek-chat-v3.1",
+                "temperature": 0.7,
+                "max_tokens": 4000
+            }
+        )
+        log_ai_message(
+            direction="sent",
             role="user",
             content=prompt,
             metadata={
@@ -810,6 +852,10 @@ def call_deepseek_api(prompt: str) -> Optional[Dict[str, Any]]:
             json={
                 "model": "deepseek/deepseek-chat-v3.1",
                 "messages": [
+                    {
+                        "role": "system",
+                        "content": TRADING_RULES_PROMPT
+                    },
                     {
                         "role": "user",
                         "content": prompt
