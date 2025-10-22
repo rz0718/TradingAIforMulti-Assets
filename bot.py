@@ -6,6 +6,7 @@ Uses Binance API for market data and OpenRouter API for DeepSeek Chat V3.1 tradi
 from __future__ import annotations
 
 import os
+import re
 import time
 import json
 import logging
@@ -41,6 +42,8 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 API_KEY = os.getenv("BN_API_KEY", "")
 API_SECRET = os.getenv("BN_SECRET", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # Trading symbols to monitor
 SYMBOLS = ["ETHUSDT", "SOLUSDT", "XRPUSDT", "BTCUSDT", "DOGEUSDT", "BNBUSDT"]
@@ -184,6 +187,8 @@ positions: Dict[str, Dict[str, Any]] = {}  # coin -> position info
 trade_history: List[Dict[str, Any]] = []
 BOT_START_TIME = datetime.now(timezone.utc)
 invocation_count: int = 0
+ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+current_iteration_messages: List[str] = []
 
 # CSV files
 STATE_CSV = DATA_DIR / "portfolio_state.csv"
@@ -303,6 +308,38 @@ def log_ai_message(direction: str, role: str, content: str, metadata: Optional[D
             content,
             json.dumps(metadata) if metadata else ""
         ])
+
+def strip_ansi_codes(text: str) -> str:
+    """Remove ANSI color codes so Telegram receives plain text."""
+    return ANSI_ESCAPE_RE.sub("", text)
+
+def record_iteration_message(text: str) -> None:
+    """Record console output for this iteration to share via Telegram."""
+    if current_iteration_messages is not None:
+        current_iteration_messages.append(strip_ansi_codes(text).rstrip())
+
+def send_telegram_message(text: str) -> None:
+    """Send a notification message to Telegram if credentials are configured."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+
+    try:
+        response = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": text,
+            },
+            timeout=10,
+        )
+        if response.status_code != 200:
+            logging.warning(
+                "Telegram notification failed (%s): %s",
+                response.status_code,
+                response.text,
+            )
+    except Exception as exc:
+        logging.error("Error sending Telegram message: %s", exc)
 
 # ───────────────────────── STATE MGMT ───────────────────────
 
@@ -1022,12 +1059,22 @@ def execute_entry(coin: str, decision: Dict[str, Any], current_price: float) -> 
     
     balance -= total_cost
     
-    print(f"{Fore.GREEN}[ENTRY] {coin} {side.upper()} {quantity:.4f} @ ${current_price:.4f}")
-    print(f"  ├─ Leverage: {leverage}x | Margin: ${margin_required:.2f}")
-    print(f"  ├─ Target: ${decision['profit_target']:.4f} | Stop: ${decision['stop_loss']:.4f}")
+    line = f"{Fore.GREEN}[ENTRY] {coin} {side.upper()} {quantity:.4f} @ ${current_price:.4f}"
+    print(line)
+    record_iteration_message(line)
+    line = f"  ├─ Leverage: {leverage}x | Margin: ${margin_required:.2f}"
+    print(line)
+    record_iteration_message(line)
+    line = f"  ├─ Target: ${decision['profit_target']:.4f} | Stop: ${decision['stop_loss']:.4f}"
+    print(line)
+    record_iteration_message(line)
     if entry_fee > 0:
-        print(f"  ├─ Estimated Fee: ${entry_fee:.2f} ({liquidity} @ {fee_rate*100:.4f}%)")
-    print(f"  └─ Confidence: {decision.get('confidence', 0)*100:.0f}%")
+        line = f"  ├─ Estimated Fee: ${entry_fee:.2f} ({liquidity} @ {fee_rate*100:.4f}%)"
+        print(line)
+        record_iteration_message(line)
+    line = f"  └─ Confidence: {decision.get('confidence', 0)*100:.0f}%"
+    print(line)
+    record_iteration_message(line)
     
     log_trade(coin, 'ENTRY', {
         'side': side,
@@ -1062,12 +1109,22 @@ def execute_close(coin: str, decision: Dict[str, Any], current_price: float) -> 
     balance += pos['margin'] + net_pnl
     
     color = Fore.GREEN if net_pnl >= 0 else Fore.RED
-    print(f"{color}[CLOSE] {coin} {pos['side'].upper()} {pos['quantity']:.4f} @ ${current_price:.4f}")
-    print(f"  ├─ Entry: ${pos['entry_price']:.4f} | Gross PnL: ${pnl:.2f}")
+    line = f"{color}[CLOSE] {coin} {pos['side'].upper()} {pos['quantity']:.4f} @ ${current_price:.4f}"
+    print(line)
+    record_iteration_message(line)
+    line = f"  ├─ Entry: ${pos['entry_price']:.4f} | Gross PnL: ${pnl:.2f}"
+    print(line)
+    record_iteration_message(line)
     if total_fees > 0:
-        print(f"  ├─ Fees Paid: ${total_fees:.2f} (includes exit fee ${exit_fee:.2f})")
-    print(f"  ├─ Net PnL: ${net_pnl:.2f}")
-    print(f"  └─ Balance: ${balance:.2f}")
+        line = f"  ├─ Fees Paid: ${total_fees:.2f} (includes exit fee ${exit_fee:.2f})"
+        print(line)
+        record_iteration_message(line)
+    line = f"  ├─ Net PnL: ${net_pnl:.2f}"
+    print(line)
+    record_iteration_message(line)
+    line = f"  └─ Balance: ${balance:.2f}"
+    print(line)
+    record_iteration_message(line)
     
     log_trade(coin, 'CLOSE', {
         'side': pos['side'],
@@ -1114,6 +1171,7 @@ def check_stop_loss_take_profit() -> None:
 
 def main() -> None:
     """Main trading loop."""
+    global current_iteration_messages
     logging.info("Initializing DeepSeek Multi-Asset Paper Trading Bot...")
     init_csv_files()
     load_state()
@@ -1124,12 +1182,17 @@ def main() -> None:
     
     logging.info(f"Starting capital: ${START_CAPITAL:.2f}")
     logging.info(f"Monitoring: {', '.join(SYMBOL_TO_COIN.values())}")
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        logging.info("Telegram notifications enabled (chat: %s).", TELEGRAM_CHAT_ID)
+    else:
+        logging.info("Telegram notifications disabled; missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID.")
     
     iteration = 0
     
     while True:
         try:
             iteration += 1
+            current_iteration_messages = []
 
             if not get_binance_client():
                 retry_delay = min(CHECK_INTERVAL, 60)
@@ -1140,9 +1203,15 @@ def main() -> None:
                 time.sleep(retry_delay)
                 continue
 
-            print(f"\n{Fore.CYAN}{'='*60}")
-            print(f"{Fore.CYAN}Iteration {iteration} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"{Fore.CYAN}{'='*60}\n")
+            line = f"\n{Fore.CYAN}{'='*60}"
+            print(line)
+            record_iteration_message(line)
+            line = f"{Fore.CYAN}Iteration {iteration} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            print(line)
+            record_iteration_message(line)
+            line = f"{Fore.CYAN}{'='*60}\n"
+            print(line)
+            record_iteration_message(line)
             
             # Check stop loss / take profit first
             check_stop_loss_take_profit()
@@ -1191,10 +1260,12 @@ def main() -> None:
                             net_unrealized = gross_unrealized - fees_paid
                             pnl_color = Fore.GREEN if net_unrealized >= 0 else Fore.RED
                             fee_note = f" (Gross: ${gross_unrealized:.2f}, Fees: ${fees_paid:.2f})" if fees_paid else ""
-                            print(
+                            line = (
                                 f"[HOLD] {coin} - Net Unrealized PnL: "
                                 f"{pnl_color}${net_unrealized:.2f}{Style.RESET_ALL}{fee_note}"
                             )
+                            print(line)
+                            record_iteration_message(line)
             
             # Display portfolio summary
             total_equity = calculate_total_equity()
@@ -1204,16 +1275,37 @@ def main() -> None:
             net_unrealized_total = total_equity - balance - total_margin
             net_color = Fore.GREEN if net_unrealized_total >= 0 else Fore.RED
             
-            print(f"\n{Fore.YELLOW}{'─'*60}")
-            print(f"{Fore.YELLOW}PORTFOLIO SUMMARY")
-            print(f"{Fore.YELLOW}{'─'*60}")
-            print(f"Available Balance: ${balance:.2f}")
+            line = f"\n{Fore.YELLOW}{'─'*60}"
+            print(line)
+            record_iteration_message(line)
+            line = f"{Fore.YELLOW}PORTFOLIO SUMMARY"
+            print(line)
+            record_iteration_message(line)
+            line = f"{Fore.YELLOW}{'─'*60}"
+            print(line)
+            record_iteration_message(line)
+            line = f"Available Balance: ${balance:.2f}"
+            print(line)
+            record_iteration_message(line)
             if total_margin > 0:
-                print(f"Margin Allocated: ${total_margin:.2f}")
-            print(f"Total Equity: {equity_color}${total_equity:.2f} ({total_return:+.2f}%){Style.RESET_ALL}")
-            print(f"Unrealized PnL: {net_color}${net_unrealized_total:.2f}{Style.RESET_ALL}")
-            print(f"Open Positions: {len(positions)}")
-            print(f"{Fore.YELLOW}{'─'*60}\n")
+                line = f"Margin Allocated: ${total_margin:.2f}"
+                print(line)
+                record_iteration_message(line)
+            line = f"Total Equity: {equity_color}${total_equity:.2f} ({total_return:+.2f}%){Style.RESET_ALL}"
+            print(line)
+            record_iteration_message(line)
+            line = f"Unrealized PnL: {net_color}${net_unrealized_total:.2f}{Style.RESET_ALL}"
+            print(line)
+            record_iteration_message(line)
+            line = f"Open Positions: {len(positions)}"
+            print(line)
+            record_iteration_message(line)
+            line = f"{Fore.YELLOW}{'─'*60}\n"
+            print(line)
+            record_iteration_message(line)
+
+            if current_iteration_messages:
+                send_telegram_message("\n".join(current_iteration_messages))
             
             # Log state
             log_portfolio_state()
