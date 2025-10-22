@@ -7,12 +7,51 @@ The app persists its runtime data (portfolio state, AI messages, and trade histo
 ## This is how it looks when running
 ![DeepSeek Trading Bot Dashboard](examples/screenshot.png)
 
+## How It Works
+- Every three minutes the bot fetches fresh candles for `ETH`, `SOL`, `XRP`, `BTC`, `DOGE`, and `BNB`, updates EMA/RSI/MACD indicators, and snapshots current positions.
+- The snapshot is turned into a detailed DeepSeek prompt that includes balances, unrealised PnL, open orders, and indicator values.
+- A trading rules system prompt (see below) is sent alongside the user prompt so the model always receives the risk framework before making decisions.
+- DeepSeek replies with JSON decisions (`hold`, `entry`, or `close`) per asset. The bot enforces position sizing, places entries/closes, and persists results.
+- Portfolio state, trade history, AI requests/responses, and per-iteration console transcripts are written to `data/` for later inspection or dashboard visualisation.
+
+## System Prompt & Decision Contract
+DeepSeek is primed with a risk-first system prompt that stresses:
+- Never risking more than 1–2% of capital on a trade
+- Mandatory stop-loss orders and pre-defined exit plans
+- Favouring trend-following setups, patience, and written trade plans
+- Thinking in probabilities while keeping position sizing under control
+
+Each iteration DeepSeek receives the live portfolio snapshot and must answer **only** with JSON resembling:
+
+```json
+{
+  "ETH": {
+    "signal": "entry",
+    "side": "long",
+    "quantity": 0.5,
+    "profit_target": 3150.0,
+    "stop_loss": 2880.0,
+    "leverage": 5,
+    "confidence": 0.72,
+    "risk_usd": 150.0,
+    "invalidation_condition": "If price closes below 4h EMA20",
+    "justification": "Momentum + RSI reset on support"
+  }
+}
+```
+
+If DeepSeek responds with `hold`, the bot still records unrealised PnL, accumulated fees, and the rationale in `ai_decisions.csv`.
+
+## Telegram Notifications
+Configure `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env` to receive a message after every iteration. The notification mirrors the console output (positions opened/closed, portfolio summary, and any warnings) so you can follow progress without tailing logs. Leave the variables empty to run without Telegram.
+
 ## Prerequisites
 
 - Docker 24+ (any engine capable of building Linux/AMD64 images)
 - A `.env` file with the required API credentials:
   - `BN_API_KEY` / `BN_SECRET` for Binance access
   - `OPENROUTER_API_KEY` for DeepSeek requests
+  - Optional: `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` for push notifications
 
 ## Build the Image
 
