@@ -106,6 +106,7 @@ Stay Informed but Trade Less
 INTERVAL = "3m"  # 3-minute candles as per DeepSeek example
 START_CAPITAL = 10000.0
 CHECK_INTERVAL = 180  # Check every 3 minutes (when candle closes)
+DEFAULT_RISK_FREE_RATE = 0.0  # Annualized baseline for Sortino ratio calculations
 
 # Indicator settings
 EMA_LEN = 20
@@ -124,6 +125,25 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
     level=logging.INFO
 )
+
+def _resolve_risk_free_rate() -> float:
+    """Determine the annualized risk-free rate used in Sortino calculations."""
+    env_value = os.getenv("SORTINO_RISK_FREE_RATE")
+    if env_value is None:
+        env_value = os.getenv("RISK_FREE_RATE")
+    if env_value is None:
+        return DEFAULT_RISK_FREE_RATE
+    try:
+        return float(env_value)
+    except (TypeError, ValueError):
+        logging.warning(
+            "Invalid SORTINO_RISK_FREE_RATE/RISK_FREE_RATE value '%s'; using default %.4f",
+            env_value,
+            DEFAULT_RISK_FREE_RATE,
+        )
+        return DEFAULT_RISK_FREE_RATE
+
+RISK_FREE_RATE = _resolve_risk_free_rate()
 
 if not dotenv_loaded:
     logging.warning(f"No .env file found at {DOTENV_PATH}; falling back to system environment variables.")
@@ -189,6 +209,7 @@ BOT_START_TIME = datetime.now(timezone.utc)
 invocation_count: int = 0
 ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 current_iteration_messages: List[str] = []
+equity_history: List[float] = []
 
 # CSV files
 STATE_CSV = DATA_DIR / "portfolio_state.csv"
@@ -418,6 +439,34 @@ def save_state() -> None:
             )
     except Exception as e:
         logging.error("Failed to save state to %s: %s", STATE_JSON, e, exc_info=True)
+
+def load_equity_history() -> None:
+    """Populate the in-memory equity history for performance calculations."""
+    equity_history.clear()
+    if not STATE_CSV.exists():
+        return
+    try:
+        df = pd.read_csv(STATE_CSV, usecols=["total_equity"])
+    except ValueError:
+        logging.warning(
+            "%s missing 'total_equity' column; Sortino ratio unavailable until new data is logged.",
+            STATE_CSV,
+        )
+        return
+    except Exception as exc:
+        logging.warning("Unable to load historical equity data: %s", exc)
+        return
+
+    values = pd.to_numeric(df["total_equity"], errors="coerce").dropna()
+    if not values.empty:
+        equity_history.extend(float(v) for v in values.tolist())
+
+def register_equity_snapshot(total_equity: float) -> None:
+    """Append the latest equity to the history if it is a finite value."""
+    if total_equity is None:
+        return
+    if isinstance(total_equity, (int, float, np.floating)) and np.isfinite(total_equity):
+        equity_history.append(float(total_equity))
 
 # ───────────────────────── INDICATORS ───────────────────────
 
@@ -994,6 +1043,49 @@ def calculate_total_equity() -> float:
     
     return total
 
+def calculate_sortino_ratio(
+    equity_values: Iterable[float],
+    period_seconds: float,
+    risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
+) -> Optional[float]:
+    """
+    Compute the annualized Sortino ratio from equity snapshots.
+
+    Args:
+        equity_values: Sequence of equity values in chronological order.
+        period_seconds: Average period between snapshots (used to annualize).
+        risk_free_rate: Annualized risk-free rate (decimal form).
+    """
+    values = [float(v) for v in equity_values if isinstance(v, (int, float, np.floating)) and np.isfinite(v)]
+    if len(values) < 2:
+        return None
+
+    returns = np.diff(values) / np.array(values[:-1], dtype=float)
+    returns = returns[np.isfinite(returns)]
+    if returns.size == 0:
+        return None
+
+    period_seconds = float(period_seconds) if period_seconds and period_seconds > 0 else CHECK_INTERVAL
+    periods_per_year = (365 * 24 * 60 * 60) / period_seconds
+    if not np.isfinite(periods_per_year) or periods_per_year <= 0:
+        return None
+
+    per_period_rf = risk_free_rate / periods_per_year
+    excess_return = returns.mean() - per_period_rf
+    if not np.isfinite(excess_return):
+        return None
+
+    downside_diff = np.minimum(returns - per_period_rf, 0.0)
+    downside_squared = downside_diff ** 2
+    downside_deviation = np.sqrt(np.mean(downside_squared))
+    if downside_deviation <= 0 or not np.isfinite(downside_deviation):
+        return None
+
+    sortino = (excess_return / downside_deviation) * np.sqrt(periods_per_year)
+    if not np.isfinite(sortino):
+        return None
+    return float(sortino)
+
 def execute_entry(coin: str, decision: Dict[str, Any], current_price: float) -> None:
     """Execute entry trade."""
     global balance
@@ -1196,6 +1288,7 @@ def main() -> None:
     global current_iteration_messages
     logging.info("Initializing DeepSeek Multi-Asset Paper Trading Bot...")
     init_csv_files()
+    load_equity_history()
     load_state()
     
     if not OPENROUTER_API_KEY:
@@ -1296,6 +1389,12 @@ def main() -> None:
             total_margin = calculate_total_margin()
             net_unrealized_total = total_equity - balance - total_margin
             net_color = Fore.GREEN if net_unrealized_total >= 0 else Fore.RED
+            register_equity_snapshot(total_equity)
+            sortino_ratio = calculate_sortino_ratio(
+                equity_history,
+                CHECK_INTERVAL,
+                RISK_FREE_RATE,
+            )
             
             line = f"\n{Fore.YELLOW}{'─'*20}"
             print(line)
@@ -1317,6 +1416,13 @@ def main() -> None:
             print(line)
             record_iteration_message(line)
             line = f"Unrealized PnL: {net_color}${net_unrealized_total:.2f}{Style.RESET_ALL}"
+            print(line)
+            record_iteration_message(line)
+            if sortino_ratio is not None:
+                sortino_color = Fore.GREEN if sortino_ratio >= 0 else Fore.RED
+                line = f"Sortino Ratio: {sortino_color}{sortino_ratio:+.2f}{Style.RESET_ALL}"
+            else:
+                line = "Sortino Ratio: N/A (need more data)"
             print(line)
             record_iteration_message(line)
             line = f"Open Positions: {len(positions)}"

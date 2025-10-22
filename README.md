@@ -45,6 +45,15 @@ If DeepSeek responds with `hold`, the bot still records unrealised PnL, accumula
 ## Telegram Notifications
 Configure `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env` to receive a message after every iteration. The notification mirrors the console output (positions opened/closed, portfolio summary, and any warnings) so you can follow progress without tailing logs. Leave the variables empty to run without Telegram.
 
+## Performance Metrics
+
+The console summary and dashboard track both realized and unrealized performance:
+
+- **Sharpe ratio** (dashboard) is computed from closed trades using balance snapshots after each exit.
+- **Sortino ratio** (bot + dashboard) comes from the equity curve and penalises downside volatility only, making it more informative when the sample size is small.
+
+By default the Sortino ratio assumes a 0% risk-free rate. Override it by defining `SORTINO_RISK_FREE_RATE` (annualized decimal, e.g. `0.03` for 3%) or, as a fallback, `RISK_FREE_RATE` in your `.env`.
+
 ## Prerequisites
 
 - Docker 24+ (any engine capable of building Linux/AMD64 images)
@@ -96,6 +105,8 @@ docker run --rm -it \
 ```
 
 Then open <http://localhost:8501> to access the UI.
+
+The top-level metrics include Sharpe and Sortino ratios alongside balance, equity, and PnL so you can quickly assess both realised returns and downside-adjusted performance.
 
 ## Development Notes
 

@@ -25,6 +25,8 @@ TRADES_CSV = DATA_DIR / "trade_history.csv"
 DECISIONS_CSV = DATA_DIR / "ai_decisions.csv"
 MESSAGES_CSV = DATA_DIR / "ai_messages.csv"
 ENV_PATH = BASE_DIR / ".env"
+DEFAULT_RISK_FREE_RATE = 0.0
+DEFAULT_SNAPSHOT_SECONDS = 180.0
 
 COIN_TO_SYMBOL: Dict[str, str] = {
     "ETH": "ETHUSDT",
@@ -42,6 +44,25 @@ else:
 
 BN_API_KEY = os.getenv("BN_API_KEY", "")
 BN_SECRET = os.getenv("BN_SECRET", "")
+
+
+def resolve_risk_free_rate() -> float:
+    """Return annualized risk-free rate configured for Sortino ratio."""
+    env_value = os.getenv("SORTINO_RISK_FREE_RATE") or os.getenv("RISK_FREE_RATE")
+    if env_value is None:
+        return DEFAULT_RISK_FREE_RATE
+    try:
+        return float(env_value)
+    except (TypeError, ValueError):
+        logging.warning(
+            "Invalid SORTINO_RISK_FREE_RATE/RISK_FREE_RATE value '%s'; using default %.4f",
+            env_value,
+            DEFAULT_RISK_FREE_RATE,
+        )
+        return DEFAULT_RISK_FREE_RATE
+
+
+RISK_FREE_RATE = resolve_risk_free_rate()
 
 BINANCE_CLIENT: Client | None = None
 if BN_API_KEY and BN_SECRET:
@@ -167,6 +188,25 @@ def fetch_current_prices(coins: List[str]) -> Dict[str, float | None]:
     return prices
 
 
+def estimate_period_seconds(index: pd.Index, default: float = DEFAULT_SNAPSHOT_SECONDS) -> float:
+    """Infer measurement cadence from a datetime-like index."""
+    if index.size < 2:
+        return default
+    try:
+        diffs = index.to_series().diff().dropna()
+    except Exception:
+        return default
+    if diffs.empty:
+        return default
+    try:
+        period_seconds = diffs.dt.total_seconds().median()
+    except AttributeError:
+        period_seconds = default
+    if not period_seconds or not np.isfinite(period_seconds) or period_seconds <= 0:
+        return default
+    return float(period_seconds)
+
+
 def compute_sharpe_ratio(trades_df: pd.DataFrame) -> float | None:
     """Compute annualized Sharpe ratio from realized (closed) trades."""
     if trades_df.empty or "action" not in trades_df.columns:
@@ -192,21 +232,44 @@ def compute_sharpe_ratio(trades_df: pd.DataFrame) -> float | None:
     if std is None or np.isclose(std, 0.0):
         return None
 
-    diffs = closes.index.to_series().diff().dropna()
-    if diffs.empty:
-        period_seconds = 180.0
-    else:
-        try:
-            period_seconds = diffs.dt.total_seconds().median()
-        except AttributeError:
-            period_seconds = 180.0
-
-    if not period_seconds or not np.isfinite(period_seconds) or period_seconds <= 0:
-        period_seconds = 180.0
+    period_seconds = estimate_period_seconds(closes.index)
 
     periods_per_year = (365 * 24 * 60 * 60) / period_seconds
     sharpe = returns.mean() / std * np.sqrt(periods_per_year)
     return float(sharpe) if np.isfinite(sharpe) else None
+
+
+def compute_sortino_ratio(state_df: pd.DataFrame, risk_free_rate: float) -> float | None:
+    """Compute annualized Sortino ratio from total equity snapshots."""
+    if state_df.empty or "total_equity" not in state_df.columns:
+        return None
+
+    equity = pd.to_numeric(state_df["total_equity"], errors="coerce").dropna()
+    if equity.size < 2:
+        return None
+
+    returns = equity.pct_change().dropna()
+    if returns.empty:
+        return None
+
+    period_seconds = estimate_period_seconds(equity.index)
+    seconds_per_year = 365 * 24 * 60 * 60
+    periods_per_year = seconds_per_year / period_seconds
+    if not np.isfinite(periods_per_year) or periods_per_year <= 0:
+        return None
+
+    per_period_rf = risk_free_rate / periods_per_year
+    excess_return = returns.mean() - per_period_rf
+    if not np.isfinite(excess_return):
+        return None
+
+    downside = np.minimum(returns - per_period_rf, 0.0)
+    downside_deviation = np.sqrt(np.mean(np.square(downside)))
+    if downside_deviation <= 0 or not np.isfinite(downside_deviation):
+        return None
+
+    sortino = (excess_return / downside_deviation) * np.sqrt(periods_per_year)
+    return float(sortino) if np.isfinite(sortino) else None
 
 
 def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> None:
@@ -242,8 +305,9 @@ def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> Non
             realized_pnl = 0.0
 
     sharpe_ratio = compute_sharpe_ratio(trades_df)
+    sortino_ratio = compute_sortino_ratio(state_df, RISK_FREE_RATE)
 
-    col_a, col_b, col_c, col_d, col_e, col_f, col_g = st.columns(7)
+    col_a, col_b, col_c, col_d, col_e, col_f, col_g, col_h = st.columns(8)
     col_a.metric("Available Balance", f"${latest['total_balance']:.2f}")
     col_b.metric("Total Equity", f"${latest['total_equity']:.2f}")
     col_c.metric("Total Return %", f"{latest['total_return_pct']:.2f}%")
@@ -257,6 +321,10 @@ def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> Non
     col_g.metric(
         "Sharpe Ratio",
         f"{sharpe_ratio:.2f}" if sharpe_ratio is not None else "N/A",
+    )
+    col_h.metric(
+        "Sortino Ratio",
+        f"{sortino_ratio:.2f}" if sortino_ratio is not None else "N/A",
     )
 
     st.subheader("Equity Over Time")
