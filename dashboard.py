@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Dict, List
 
+import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -143,6 +145,36 @@ def get_ai_messages() -> pd.DataFrame:
     return df
 
 
+@st.cache_data(ttl=60)
+def get_local_btc_price_series() -> pd.DataFrame:
+    """Extract BTC prices from logged AI messages (no external calls)."""
+    messages_df = load_csv(MESSAGES_CSV, parse_dates=["timestamp"])
+    if messages_df.empty or "content" not in messages_df.columns:
+        return pd.DataFrame()
+
+    pattern = re.compile(r"BTC MARKET SNAPSHOT.*?- Price:\s*([0-9.,]+)", re.DOTALL)
+
+    def _extract_price(text: str) -> float | None:
+        matches = pattern.findall(str(text))
+        if not matches:
+            return None
+        raw_value = matches[-1].replace(",", "")
+        try:
+            return float(raw_value)
+        except ValueError:
+            return None
+
+    messages_df["btc_price"] = messages_df["content"].apply(_extract_price)
+    price_df = (
+        messages_df.dropna(subset=["btc_price"])[["timestamp", "btc_price"]]
+        .drop_duplicates(subset=["timestamp"])
+        .sort_values("timestamp")
+    )
+    price_df["btc_price"] = pd.to_numeric(price_df["btc_price"], errors="coerce")
+    price_df.dropna(subset=["btc_price"], inplace=True)
+    return price_df
+
+
 def parse_positions(position_text: str | float) -> pd.DataFrame:
     """Split compact position text into structured rows."""
     if pd.isna(position_text) or not isinstance(position_text, str):
@@ -150,7 +182,7 @@ def parse_positions(position_text: str | float) -> pd.DataFrame:
     if position_text.strip().lower() == "no positions":
         return pd.DataFrame()
 
-    rows: List[Dict[str, str]] = []
+    rows: List[Dict[str, str | float]] = []
     for chunk in position_text.split(";"):
         chunk = chunk.strip()
         if not chunk:
@@ -327,8 +359,94 @@ def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> Non
         f"{sortino_ratio:.2f}" if sortino_ratio is not None else "N/A",
     )
 
-    st.subheader("Equity Over Time")
-    st.line_chart(state_df["total_equity"], height=260)
+    st.subheader("Equity Over Time (with BTC benchmark)")
+    base_investment = 10_000.0
+
+    chart_frames = [
+        pd.DataFrame(
+            {
+                "timestamp": state_df.index,
+                "Series": "Portfolio equity",
+                "Value": pd.to_numeric(state_df["total_equity"], errors="coerce").values,
+            }
+        )
+    ]
+
+    btc_series = get_local_btc_price_series()
+    btc_caption = None
+    if not btc_series.empty and len(state_df.index) > 0:
+        timeline = state_df.reset_index()[["timestamp"]].sort_values("timestamp")
+        benchmark = pd.merge_asof(
+            timeline,
+            btc_series.sort_values("timestamp"),
+            on="timestamp",
+            direction="backward",
+        )
+        benchmark["btc_price"] = benchmark["btc_price"].ffill().bfill()
+        valid_prices = benchmark["btc_price"].dropna()
+        if not valid_prices.empty:
+            base_price = float(valid_prices.iloc[0])
+            if base_price > 0:
+                btc_values = base_investment * (benchmark["btc_price"] / base_price)
+                chart_frames.append(
+                    pd.DataFrame(
+                        {
+                            "timestamp": benchmark["timestamp"],
+                            "Series": "BTC buy & hold",
+                            "Value": btc_values,
+                        }
+                    )
+                )
+                btc_caption = "BTC benchmark derived from logged market snapshots."
+
+    equity_chart_df = pd.concat(chart_frames).dropna(subset=["timestamp", "Value"])
+    equity_chart_df.sort_values("timestamp", inplace=True)
+
+    lower = float(equity_chart_df["Value"].min())
+    upper = float(equity_chart_df["Value"].max())
+    span = upper - lower
+    if span <= 0:
+        span = max(upper * 0.02, 1.0)
+    padding = span * 0.1
+    lower_bound = max(0.0, lower - padding)
+    upper_bound = upper + padding
+
+    equity_chart = (
+        alt.Chart(equity_chart_df)
+        .mark_line(interpolate="monotone")
+        .encode(
+            x=alt.X("timestamp:T", title="Time"),
+            y=alt.Y(
+                "Value:Q",
+                title="Value ($)",
+                scale=alt.Scale(domain=[lower_bound, upper_bound]),
+            ),
+            color=alt.Color(
+                "Series:N",
+                title="Series",
+                scale=alt.Scale(
+                    domain=["Portfolio equity", "BTC buy & hold"],
+                    range=["#f58518", "#4c78a8"],
+                ),
+            ),
+            tooltip=[
+                alt.Tooltip("timestamp:T", title="Timestamp"),
+                alt.Tooltip("Series:N", title="Series"),
+                alt.Tooltip("Value:Q", title="Value", format="$.2f"),
+            ],
+        )
+        .properties(height=280)
+        .interactive()
+    )
+    baseline = (
+        alt.Chart(pd.DataFrame({"Value": [base_investment]}))
+        .mark_rule(color="#888888", strokeDash=[6, 3])
+        .encode(y="Value:Q")
+    )
+    combined_chart = (equity_chart + baseline).resolve_scale(color='independent')
+    st.altair_chart(combined_chart, use_container_width=True)
+    if btc_caption:
+        st.caption(btc_caption)
 
     st.subheader("Open Positions")
     positions_df = parse_positions(latest.get("position_details", ""))
@@ -347,7 +465,7 @@ def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> Non
                 diff = row["entry_price"] - price
             return diff * row["quantity"]
 
-        positions_df["unrealized_pnl"] = positions_df.apply(_row_unrealized, axis=1)
+        positions_df["unrealized_pnl"] = positions_df.apply(_row_unrealized, axis=1)  # type: ignore
 
         if positions_df["current_price"].isna().all():
             st.caption("Live price lookup unavailable; showing entry data only.")
