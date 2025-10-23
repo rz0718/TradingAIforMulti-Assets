@@ -420,9 +420,9 @@ def main() -> None:
     st.set_page_config(page_title="DeepSeek Bot Monitor", layout="wide")
     st.title("DeepSeek Trading Bot Monitor")
 
-    if st.sidebar.button("Refresh data"):
+    if st.button("🔄 Refresh Data"):
         st.cache_data.clear()
-        st.experimental_rerun()
+        st.rerun()
 
     state_df = get_portfolio_state()
     trades_df = get_trades()
