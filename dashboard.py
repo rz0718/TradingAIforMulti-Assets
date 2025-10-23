@@ -444,7 +444,7 @@ def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> Non
         .encode(y="Value:Q")
     )
     combined_chart = (equity_chart + baseline).resolve_scale(color='independent')
-    st.altair_chart(combined_chart, use_container_width=True)
+    st.altair_chart(combined_chart, use_container_width=True)  # type: ignore[arg-type]
     if btc_caption:
         st.caption(btc_caption)
 
