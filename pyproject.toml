@@ -1,0 +1,19 @@
+[project]
+name = "llm-trader-test"
+version = "0.1.0"
+description = "A modular LLM-based crypto trading bot."
+requires-python = ">=3.8"
+dependencies = [
+    "colorama==0.4.6",
+    "dotenv>=0.9.9",
+    "numpy>=1.24.4",
+    "openai==1.35.13",
+    "python-binance==1.0.19",
+    "python-dotenv==1.0.0",
+    "requests==2.31.0",
+    "streamlit==1.38.0",
+    "httpx<0.28.0",
+]
+
+[tool.uv]
+index-url = "https://mirrors.aliyun.com/pypi/simple/"
