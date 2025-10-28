@@ -161,24 +161,10 @@ IMPORTANT RULES:
 
 FIELD DEFINITIONS:
 
-- quantity: The amount of the coin to trade (not USD value, but actual coin units)
-  * For ETH: quantity in ETH (e.g., 0.5 ETH)
-  * For BTC: quantity in BTC (e.g., 0.02 BTC)
-  * This is the BASE amount BEFORE leverage is applied
-  * The actual position size = quantity × coin_price × leverage
-  * Calculate quantity based on your risk tolerance and stop distance
-  
-  Example calculation:
-  - If willing to risk $500, Entry: $3,200, Stop: $3,100, Leverage: 10x
-  - Price difference: $100
-  - Quantity = $500 / ($100 × 10) = 0.5 ETH
-  - Position value = 0.5 × $3,200 × 10 = $16,000 exposure
-  - If stopped out: loss = 0.5 × $100 × 10 = $500 ✓
-
-- leverage: The multiplier applied to your position size
+- leverage: The multiplier applied to your margin to create your position size
   * Common values: 1x (no leverage), 5x, 10x, 20x, 50x, 100x
   * Higher leverage = larger position with same capital BUT higher liquidation risk
-  * 10x leverage means you control 10× the value with same margin
+  * 10x leverage means you control 10× the value with 1/10th the margin
   * Liquidation occurs when loss reaches (100/leverage)%
     - 10x leverage → liquidated at ~10% adverse move
     - 20x leverage → liquidated at ~5% adverse move
@@ -194,6 +180,24 @@ FIELD DEFINITIONS:
   - Entry: $3,200
   - Liquidation: $3,200 × (1 - 0.9/10) = $3,200 × 0.91 = $2,912
   - Your stop_loss at $3,100 is SAFE (above liquidation)
+
+- quantity: The TOTAL position size AFTER leverage is applied
+  * This is the actual amount of coins you will be trading
+  * For ETH: quantity in ETH (e.g., 1.5 ETH means you're trading 1.5 ETH total)
+  * For BTC: quantity in BTC (e.g., 0.2 BTC means you're trading 0.2 BTC total)
+  * Position value = quantity × entry_price
+  * Margin required = (quantity × entry_price) / leverage
+  
+  Example calculation:
+  - If you want to trade 1.5 ETH at Entry: $3,200 with 10x leverage
+  - Position value = 1.5 ETH × $3,200 = $4,800
+  - Margin required = $4,800 / 10 = $480
+  - You control 1.5 ETH but only need $480 as collateral
+  
+  To calculate quantity from desired margin:
+  - Desired margin: $500, Entry: $3,200, Leverage: 10x
+  - Position value = $500 × 10 = $5,000
+  - Quantity = $5,000 / $3,200 = 1.5625 ETH
 
 - profit_target: The price level where you will take profits and close the position. This should be based on:
   * Technical resistance/support levels
@@ -220,13 +224,13 @@ EXAMPLE 1 - ENTRY signal (opening new long position with 10x leverage):
   "ETH": {
     "signal": "entry",
     "side": "long",
-    "quantity": 0.5,
+    "leverage": 10,
+    "quantity": 1.57,
     "profit_target": 3250.0,
     "stop_loss": 3100.0,
-    "leverage": 10,
     "confidence": 0.82,
     "invalidation_condition": "If price closes below 3150 on a 3-minute candle",
-    "justification": "Bullish divergence on RSI with volume confirmation, breaking above key resistance at 3180. Entry at 3180, target at previous high 3250 (R:R 2.3:1), stop below support at 3100. Liquidation at ~2,898, stop safely above. Position: 0.5 ETH × $3,180 × 10x = $15,900 exposure"
+    "justification": "Bullish divergence on RSI with volume confirmation, breaking above key resistance at 3180. Entry at 3180, target at previous high 3250 (R:R 2.3:1), stop below support at 3100. Trading 1.57 ETH total (position value $4,995). Margin required: $4,995 / 10 = $499.50. Liquidation at ~2,898, stop safely above."
   }
 }
 
@@ -235,10 +239,10 @@ EXAMPLE 2 - HOLD signal (maintaining current position):
   "BTC": {
     "signal": "hold",
     "side": "",
-    "quantity": 0.02,
+    "leverage": 10,
+    "quantity": 0.074,
     "profit_target": 68500.0,
     "stop_loss": 66000.0,
-    "leverage": 10,
     "confidence": 0.75,
     "invalidation_condition": "If price closes below 66800 on a 3-minute candle",
     "justification": ""
@@ -250,13 +254,13 @@ EXAMPLE 3 - CLOSE signal (closing existing position):
   "SOL": {
     "signal": "close",
     "side": "",
-    "quantity": 5.0,
+    "leverage": 10,
+    "quantity": 31.25,
     "profit_target": 0.0,
     "stop_loss": 0.0,
-    "leverage": 10,
     "confidence": 0.88,
     "invalidation_condition": "",
-    "justification": "Target reached at 185, taking profit with +$1,250 gain. Bearish divergence forming on 15m chart, securing profits. Closed 5 SOL position opened at $160 with 10x leverage"
+    "justification": "Target reached at 185, taking profit. Bearish divergence forming on 15m chart, securing profits. Closed 31.25 SOL position (value $5,781) opened at $160 with 10x leverage, margin used was $500"
   }
 }
 
@@ -265,13 +269,13 @@ EXAMPLE 4 - ENTRY signal (opening new short position with high leverage):
   "BNB": {
     "signal": "entry",
     "side": "short",
-    "quantity": 2.5,
+    "leverage": 20,
+    "quantity": 50.0,
     "profit_target": 580.0,
     "stop_loss": 615.0,
-    "leverage": 20,
     "confidence": 0.79,
     "invalidation_condition": "If price closes above 610 on a 3-minute candle",
-    "justification": "Rejected at resistance 605, bearish engulfing pattern with increasing volume. Entry at 600, target at support 580 (R:R 1.4:1), stop above resistance at 615. Using 20x leverage for tighter stop. Liquidation at ~618, stop safely below. Position: 2.5 BNB × $600 × 20x = $30,000 exposure"
+    "justification": "Rejected at resistance 605, bearish engulfing pattern with increasing volume. Entry at 600, target at support 580 (R:R 1.4:1), stop above resistance at 615. Trading 50 BNB total (position value $30,000). Margin required: $30,000 / 20 = $1,500. Liquidation at ~618, stop safely below."
   }
 }
 
@@ -280,13 +284,13 @@ EXAMPLE 5 - ENTRY signal with conservative leverage:
   "XRP": {
     "signal": "entry",
     "side": "long",
-    "quantity": 800.0,
+    "leverage": 5,
+    "quantity": 4237.0,
     "profit_target": 0.62,
     "stop_loss": 0.56,
-    "leverage": 5,
     "confidence": 0.76,
     "invalidation_condition": "If price closes below 0.57 on a 3-minute candle or breaks down from ascending triangle",
-    "justification": "Breaking out of ascending triangle at 0.585, entry at 0.59. Target at 0.62 (measured move). Using conservative 5x leverage for altcoin volatility. Initial stop at 0.56 (below triangle support), will trail stop to breakeven once price hits 0.605. Liquidation at ~0.484, stop safely above. Position: 800 XRP × $0.59 × 5x = $2,360 exposure"
+    "justification": "Breaking out of ascending triangle at 0.585, entry at 0.59. Target at 0.62 (measured move). Trading 4,237 XRP total (position value $2,500). Margin required: $2,500 / 5 = $500. Using conservative 5x leverage for altcoin volatility. Stop at 0.56 (below triangle support). Liquidation at ~0.484, stop safely above."
   }
 }
 
@@ -295,20 +299,23 @@ EXAMPLE 6 - ENTRY signal showing quantity calculation:
   "SOL": {
     "signal": "entry",
     "side": "long",
-    "quantity": 3.0,
+    "leverage": 10,
+    "quantity": 28.09,
     "profit_target": 185.0,
     "stop_loss": 175.0,
-    "leverage": 10,
     "confidence": 0.81,
     "invalidation_condition": "If price closes below 177 on a 3-minute candle",
-    "justification": "Quantity calculation: for $500 risk, stop_distance $10 × leverage 10x = $100, so 500 / 100 = 5 units, rounded to 3 for conservative sizing. Breakout from consolidation at $178, targeting $185 resistance. Liquidation at ~162, stop at $175 provides safety buffer"
+    "justification": "Quantity calculation: using $500 margin with 10x leverage at entry $178. Position value = $500 × 10 = $5,000. Quantity = $5,000 / $178 = 28.09 SOL. Breakout from consolidation, targeting $185 resistance. Liquidation at ~162, stop at $175 provides safety buffer."
   }
 }
 
 LEVERAGE AND QUANTITY RELATIONSHIP:
-- Higher leverage → smaller quantity needed for same risk exposure
-- Lower leverage → larger quantity needed for same risk exposure
-- Position value = quantity × price × leverage
+- **leverage comes FIRST in JSON structure, then quantity**
+- quantity represents your TOTAL position size (after leverage)
+- Margin required = (quantity × entry_price) / leverage
+- Position value = quantity × entry_price
+- Higher leverage → trade more coins with same margin
+- Lower leverage → trade fewer coins with same margin
 - Always verify: stop_loss will be hit BEFORE liquidation price
 - For volatile altcoins: use 5-10x leverage maximum
 - For major coins (BTC/ETH): 10-20x can be acceptable with tight stops
@@ -321,7 +328,7 @@ RISK MANAGEMENT RULES:
 - For ENTRY: both profit_target and stop_loss must be realistic price levels with clear reasoning
 - For HOLD: maintain existing profit_target and stop_loss unless price action demands adjustment
 - For CLOSE: set both to 0.0 as position is being exited
-- quantity should be calculated to ensure your risk tolerance is respected while avoiding liquidation
+- quantity should be calculated based on: (desired_margin × leverage) / entry_price
 - Never use percentage-based stops without considering market structure and volatility
 
 FORMAT RULES:
@@ -332,8 +339,8 @@ FORMAT RULES:
 - side: "long", "short", or "" (empty only for hold/close)
 - justification: required for entry/close, "" for hold
 - profit_target and stop_loss: must be actual price levels, not percentages
-- quantity: must be in coin units (not USD), calculated based on your risk tolerance and leverage
-- leverage: must be realistic (5-20x recommended), always verify stop is before liquidation
+- **leverage: must come BEFORE quantity in the JSON structure**
+- **quantity: represents TOTAL position size after leverage**
 
 IMPORTANT:
 - Only suggest entries if you see strong opportunities
