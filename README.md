@@ -1,80 +1,80 @@
-# 模块化大模型量化交易机器人
+# Modular LLM-based Quantitative Trading Bot
 
-这是一个基于大语言模型（LLM）进行决策的加密货币量化交易机器人（纸上交易）。
+This is a cryptocurrency quantitative trading bot (paper trading) that uses Large Language Models (LLM) for decision-making.
 
-项目已经过重构，将原有的单一脚本拆分为多个独立的、功能明确的模块，以提高代码的可读性、可维护性和可扩展性。
+The project has been refactored, breaking down the original single script into multiple independent, functionally clear modules to improve code readability, maintainability, and extensibility.
 
-## 项目结构
+## Project Structure
 
-重构后的项目遵循模块化的结构：
+The refactored project follows a modular structure:
 
 ```
 .
-├── bot/                  # 核心机器人逻辑模块
-│   ├── __init__.py       # 将 bot 目录标记为 Python 包
-│   ├── config.py         # 配置加载与管理
-│   ├── clients.py        # API 客户端初始化 (币安, LLM)
-│   ├── data_processing.py  # 市场数据获取与技术指标计算
-│   ├── prompts.py        # LLM 的 Prompt 构建
-│   ├── trading_workflow.py # 核心交易工作流与状态管理
-│   └── utils.py          # 通用工具函数 (如日志, CSV 操作)
-├── main.py               # 项目主入口点
-├── dashboard.py          # 可视化监控仪表盘
-├── pyproject.toml        # 项目配置文件 (用于配置 uv 镜像源)
-├── requirements.txt      # Python 依赖项
-├── .env                  # 环境变量文件 (本地配置)
-├── .env.example          # 环境变量示例文件
-└── data/                 # 存放运行时数据 (CSV 日志等)
+├── bot/                  # Core bot logic modules
+│   ├── __init__.py       # Marks bot directory as Python package
+│   ├── config.py         # Configuration loading and management
+│   ├── clients.py        # API client initialization (Binance, LLM)
+│   ├── data_processing.py  # Market data fetching and technical indicator calculations
+│   ├── prompts.py        # LLM prompt construction
+│   ├── trading_workflow.py # Core trading workflow and state management
+│   └── utils.py          # Common utility functions (logging, CSV operations)
+├── main.py               # Project main entry point
+├── dashboard.py          # Visualization monitoring dashboard
+├── pyproject.toml        # Project configuration file (for configuring uv mirror sources)
+├── requirements.txt      # Python dependencies
+├── .env                  # Environment variables file (local configuration)
+├── .env.example          # Environment variables example file
+└── data/                 # Runtime data storage (CSV logs, etc.)
 ```
 
 ---
 
-## 各脚本功能介绍
+## Script Functionality Overview
 
 #### `main.py`
-项目的唯一入口文件。它的职责非常简单：导入并调用 `trading_workflow` 中的主循环函数，启动机器人。
+The project's single entry point file. Its responsibility is very simple: import and call the main loop function from `trading_workflow` to start the bot.
 
 #### `dashboard.py`
-一个使用 Streamlit 构建的交互式网页仪表盘，用于可视化监控机器人的实时表现和历史数据。详情请见下文“可视化仪表盘”部分。
+An interactive web dashboard built with Streamlit for visualizing the bot's real-time performance and historical data. See the "Visualization Dashboard" section below for details.
 
 #### `pyproject.toml`
-项目遵循 PEP 621 标准的配置文件。当前主要用于为 `uv` 等现代包管理工具配置 PyPI 镜像源，以加速和稳定依赖安装过程。
+A configuration file following PEP 621 standards. Currently mainly used to configure PyPI mirror sources for modern package management tools like `uv` to speed up and stabilize the dependency installation process.
 
 #### `bot/config.py`
-负责管理项目的所有配置。它会从 `.env` 文件中加载 API 密钥等敏感信息，并定义了如交易对、技术指标参数等静态配置。所有其他模块需要配置信息时，都应从此文件导入。
+Manages all project configurations. It loads sensitive information like API keys from the `.env` file and defines static configurations such as trading pairs and technical indicator parameters. All other modules should import configuration information from this file.
 
 #### `bot/clients.py`
-管理与外部服务的所有 API 连接。它包含：
-- **币安客户端 (`get_binance_client`)**: 初始化并维护一个币安客户端单例，用于获取市场数据。
-- **LLM 客户端 (`get_llm_client`)**: 初始化一个与 OpenAI API 兼容的客户端。这个客户端是**可适配的**，您可以通过在 `.env` 文件中设置 `LLM_API_KEY`, `LLM_BASE_URL` 和 `LLM_MODEL_NAME` 来轻松切换不同的模型服务商（如官方 OpenAI, Azure OpenAI, 或任何其他兼容的代理服务）。
+Manages all API connections to external services. It includes:
+- **Binance Client (`get_binance_client`)**: Initializes and maintains a Binance client singleton for fetching market data.
+- **LLM Client (`get_llm_client`)**: Initializes an OpenAI API-compatible client. This client is **adaptable** - you can easily switch between different model service providers (such as official OpenAI, Azure OpenAI, or any other compatible proxy service) by setting `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL_NAME` in the `.env` file.
 
 #### `bot/data_processing.py`
-所有数据处理和分析的逻辑都集中在此。它负责从币安获取 K 线数据，并计算各种技术指标（如 EMA, RSI, MACD, ATR 等），为决策提供数据支持。
+All data processing and analysis logic is centralized here. It's responsible for fetching K-line data from Binance and calculating various technical indicators (such as EMA, RSI, MACD, ATR, etc.) to provide data support for decision-making.
 
 #### `bot/prompts.py`
-专门用于构建发送给大模型的 Prompt。它将账户状态（余额、仓位）、详细的市场数据和技术指标组合成一个结构化的、信息丰富的 Prompt，引导 LLM 做出交易决策。
+Specifically designed for constructing prompts sent to the large language model. It combines account status (balance, positions), detailed market data, and technical indicators into a structured, information-rich prompt that guides the LLM to make trading decisions.
 
 #### `bot/trading_workflow.py`
-这是机器人的核心。它包含：
-- **状态管理 (`TradingState` 类)**: 跟踪机器人的所有动态状态，如现金余额、当前持仓、历史净值等。
-- **主交易循环 (`run_trading_loop`)**: 一个无限循环，在每个时间周期内按顺序执行“获取数据 -> 生成决策 -> 执行交易”的完整流程。
-- **交易执行**: 包含执行买入、卖出、止盈、止损等具体交易逻辑的函数（当前为占位符，需要进一步实现）。
+This is the core of the bot. It includes:
+- **State Management (`TradingState` class)**: Tracks all dynamic states of the bot, such as cash balance, current positions, historical net value, etc.
+- **Main Trading Loop (`run_trading_loop`)**: An infinite loop that executes the complete "fetch data -> generate decision -> execute trade" process in each time cycle.
+- **Trade Execution**: Contains functions for executing specific trading logic like buy, sell, take profit, stop loss, etc. (currently placeholders that need further implementation).
 
 #### `bot/utils.py`
-存放项目范围内的通用工具函数，以保持其他模块的整洁。目前包含：
-- 日志系统初始化。
-- CSV 文件的创建和写入操作（用于记录交易、净值和 AI 决策）。
-- Telegram 通知功能。
+Stores project-wide common utility functions to keep other modules clean. Currently includes:
+- Logging system initialization.
+- CSV file creation and write operations (for recording trades, net value, and AI decisions).
+- Telegram notification functionality.
 
 ---
 
-## 安装与使用
+## Installation and Usage
 
-### 1. 环境管理 (使用 uv)
+### 1. Environment Management (using uv)
 
-本项目推荐使用 `uv` 进行包管理，它是一个极速的 Python 包安装器和虚拟环境管理器。
+This project recommends using `uv` for package management, which is an extremely fast Python package installer and virtual environment manager.
 
-**a. 安装 uv** (如果您的系统中尚未安装)
+**a. Install uv** (if not already installed on your system)
 
 ```bash
 # macOS / Linux
@@ -84,76 +84,76 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-**b. 创建并激活虚拟环境**
+**b. Create and activate virtual environment**
 
-在项目根目录下运行：
+Run in the project root directory:
 
 ```bash
-# 1. 创建虚拟环境
+# 1. Create virtual environment
 uv venv
 
-# 2. 激活虚拟环境
+# 2. Activate virtual environment
 # macOS / Linux
 source .venv/bin/activate
 # Windows
 .venv\Scripts\activate
 ```
 
-### 2. 安装依赖
+### 2. Install Dependencies
 
-在激活虚拟环境后，使用 `uv` 安装 `requirements.txt` 中列出的所有依赖。项目已配置 `pyproject.toml` 文件，`uv` 会自动使用国内镜像源来加速下载。
+After activating the virtual environment, use `uv` to install all dependencies listed in `requirements.txt`. The project has configured the `pyproject.toml` file, and `uv` will automatically use domestic mirror sources to speed up downloads.
 
 ```bash
 uv pip install -r requirements.txt
 ```
 
-### 3. 环境配置
+### 3. Environment Configuration
 
-项目通过 `.env` 文件管理敏感信息和环境配置。
+The project manages sensitive information and environment configuration through the `.env` file.
 
-1.  将 `.env.example` 文件复制一份，并重命名为 `.env`。
-2.  打开 `.env` 文件并填入您的个人信息。
+1. Copy the `.env.example` file and rename it to `.env`.
+2. Open the `.env` file and fill in your personal information.
 
-**必填项:**
+**Required fields:**
 
-- `BN_API_KEY`: 您的币安 API Key。
-- `BN_SECRET`: 您的币安 Secret Key。
-- `LLM_API_KEY`: 您使用的大模型服务的 API Key (例如 OpenAI 的 `sk-...`)。
+- `BN_API_KEY`: Your Binance API Key.
+- `BN_SECRET`: Your Binance Secret Key.
+- `LLM_API_KEY`: The API Key for the large language model service you're using (e.g., OpenAI's `sk-...`).
 
-**可选项:**
+**Optional fields:**
 
-- `LLM_BASE_URL`: 如果您使用代理或非官方的 OpenAI 兼容服务，请在此处填写其基础 URL。
-- `LLM_MODEL_NAME`: 指定要使用的模型名称，默认为 `gpt-4o`。
-- `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`: 如果您想接收 Telegram 通知，请填写。
+- `LLM_BASE_URL`: If you're using a proxy or non-official OpenAI-compatible service, please fill in its base URL here.
+- `LLM_MODEL_NAME`: Specify the model name to use, defaults to `gpt-4o`.
+- `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`: If you want to receive Telegram notifications, please fill these in.
 
-### 4. 运行机器人
+### 4. Run the Bot
 
-完成配置后，只需运行 `main.py` 文件即可启动机器人：
+After completing the configuration, simply run the `main.py` file to start the bot:
 
 ```bash
 python main.py
 ```
 
-机器人启动后，将开始按设定的时间间隔（默认为3分钟）执行交易循环，并在控制台打印详细信息。
+After the bot starts, it will begin executing trading loops at the set time interval (default 3 minutes) and print detailed information to the console.
 
 ---
 
-## 可视化仪表盘 (Dashboard)
+## Visualization Dashboard
 
-`dashboard.py` 提供了一个交互式网页，用于可视化监控机器人的表现。
+`dashboard.py` provides an interactive web page for visualizing and monitoring the bot's performance.
 
-### 主要功能
+### Main Features
 
-- **实时监控**: 展示总资产、回报率、持仓状态、浮动盈亏等关键指标。
-- **性能分析**: 绘制资产净值曲线，并与 BTC 买入持有策略进行对比。
-- **历史追溯**: 以表格形式清晰地展示每一笔历史交易和 AI 的决策记录。
+- **Real-time Monitoring**: Displays key metrics like total assets, return rate, position status, floating P&L, etc.
+- **Performance Analysis**: Plots asset net value curves and compares them with BTC buy-and-hold strategy.
+- **Historical Tracking**: Clearly displays each historical trade and AI decision record in table format.
 
-### 如何运行
+### How to Run
 
-确保您的虚拟环境已激活，然后在项目根目录下运行以下命令：
+Ensure your virtual environment is activated, then run the following command in the project root directory:
 
 ```bash
 streamlit run dashboard.py
 ```
 
-运行后，它会在您的浏览器中自动打开一个本地网页，展示仪表盘内容。
+After running, it will automatically open a local web page in your browser displaying the dashboard content.

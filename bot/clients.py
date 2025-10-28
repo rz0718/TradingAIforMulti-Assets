@@ -15,6 +15,7 @@ from bot import config
 _binance_client: Optional[Client] = None
 _llm_client: Optional[OpenAI] = None
 
+
 def get_binance_client() -> Optional[Client]:
     """Return a connected Binance client singleton or None if initialization failed."""
     global _binance_client
@@ -22,6 +23,7 @@ def get_binance_client() -> Optional[Client]:
     _binance_client = Client(config.BN_API_KEY, config.BN_SECRET, testnet=False)
 
     return _binance_client
+
 
 def get_llm_client() -> Optional[OpenAI]:
     """Return an initialized OpenAI-compatible client singleton."""
@@ -35,10 +37,10 @@ if __name__ == "__main__":
     binance_client = get_binance_client()
     llm_client = get_llm_client()
     # print(binance_client.get_account())
-    
-    messages=[
-        {'role': 'system', 'content': 'You are a helpful assistant.'},
-        {'role': 'user', 'content': '你是谁'}
+
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "who are you?"},
     ]
     response = llm_client.chat.completions.create(
         model=config.LLM_MODEL_NAME,
@@ -47,7 +49,6 @@ if __name__ == "__main__":
         max_tokens=256,
         top_p=1,
         frequency_penalty=0,
-        presence_penalty=0
+        presence_penalty=0,
     )
     print(response.choices[0].message.content)
-        

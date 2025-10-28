@@ -26,7 +26,7 @@ BN_SECRET = os.getenv("BN_SECRET", "")
 
 # --- LLM PROVIDER (OpenAI Compatible) ---
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", None) # For proxies or other providers
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", None)  # For proxies or other providers
 LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gpt-4o")
 
 # --- TELEGRAM NOTIFICATIONS ---
@@ -41,11 +41,11 @@ SYMBOL_TO_COIN = {
     "XRPUSDT": "XRP",
     "BTCUSDT": "BTC",
     "DOGEUSDT": "DOGE",
-    "BNBUSDT": "BNB"
+    "BNBUSDT": "BNB",
 }
 INTERVAL = "3m"  # 3-minute candles
 START_CAPITAL = 10000.0
-CHECK_INTERVAL = 30 * 60  # Check every 3 minutes (when candle closes)
+CHECK_INTERVAL = 3 * 60  # Check every 3 minutes (when candle closes)
 
 # --- INDICATOR SETTINGS ---
 EMA_LEN = 20
@@ -55,7 +55,7 @@ MACD_SLOW = 26
 MACD_SIGNAL = 9
 
 # --- FEE & RISK ---
-MAKER_FEE_RATE = 0.0         # 0.0000%
-TAKER_FEE_RATE = 0.000275    # 0.0275%
+MAKER_FEE_RATE = 0.0  # 0.0000%
+TAKER_FEE_RATE = 0.000275  # 0.0275%
 DEFAULT_RISK_FREE_RATE = 0.0
 RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", DEFAULT_RISK_FREE_RATE))
