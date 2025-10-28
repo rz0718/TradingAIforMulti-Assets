@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """
-Main entry point for the trading bot.
+Main entry point for the multi-LLM trading bot.
 """
 
-from bot.trading_workflow import run_trading_loop
+import asyncio
+from dotenv import load_dotenv
+from bot.multi_trading_workflow import MultiTradingWorkflow
+
+# Load environment variables from .env file
+load_dotenv()
+
+
+async def main():
+    """Main entry point for multi-LLM trading system."""
+    workflow = MultiTradingWorkflow()
+    await workflow.run_trading_loop()
+
 
 if __name__ == "__main__":
-    run_trading_loop()
+    asyncio.run(main())

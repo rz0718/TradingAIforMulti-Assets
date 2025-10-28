@@ -1,34 +1,43 @@
 #!/usr/bin/env python3
 """
-Configuration loader for the trading bot.
+Configuration file for the Multi-LLM Trading Bot.
 """
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# --- PATHS ---
-BASE_DIR = Path(__file__).resolve().parent.parent
-DOTENV_PATH = BASE_DIR / ".env"
+# Load environment variables from .env file
+load_dotenv()
 
-# --- ENV LOADING ---
-if DOTENV_PATH.exists():
-    load_dotenv(dotenv_path=DOTENV_PATH, override=True)
-else:
-    load_dotenv(override=True)
+# --- DATA DIRECTORY ---
+DATA_DIR = Path(os.getenv("TRADEBOT_DATA_DIR", "data"))
+DATA_DIR.mkdir(exist_ok=True)
 
-DEFAULT_DATA_DIR = BASE_DIR / "data"
-DATA_DIR = Path(os.getenv("TRADEBOT_DATA_DIR", str(DEFAULT_DATA_DIR))).expanduser()
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-# --- BINANCE API ---
+# --- BINANCE API CONFIGURATION ---
 BN_API_KEY = os.getenv("BN_API_KEY", "")
 BN_SECRET = os.getenv("BN_SECRET", "")
 
-# --- LLM PROVIDER (OpenAI Compatible) ---
-LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", None)  # For proxies or other providers
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gpt-4o")
+# --- OPENROUTER MULTI-LLM CONFIGURATION ---
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# Two LLM Models for Focused Testing (Claude Sonnet and Gemini Pro)
+LLM_MODELS = {
+    "deepseek_v3.1": {
+        "model_id": "deepseek/deepseek-chat-v3.1",
+        "name": "DeepSeek V3.1",
+        "provider": "DeepSeek",
+        "max_tokens": 4000,
+        "temperature": 0.7,
+    },
+    "qwen3_max": {
+        "model_id": "qwen/qwen3-max",
+        "name": "Qwen3 Max",
+        "provider": "Qwen",
+        "max_tokens": 4000,
+        "temperature": 0.7,
+    },
+}
 # --- TELEGRAM NOTIFICATIONS ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -44,8 +53,9 @@ SYMBOL_TO_COIN = {
     "BNBUSDT": "BNB",
 }
 INTERVAL = "3m"  # 3-minute candles
-START_CAPITAL = 10000.0
 CHECK_INTERVAL = 3 * 60  # Check every 3 minutes (when candle closes)
+START_CAPITAL = 10000.0
+CAPITAL_PER_LLM = START_CAPITAL  # $10,000 per LLM (2 models total)
 
 # --- INDICATOR SETTINGS ---
 EMA_LEN = 20
@@ -53,9 +63,19 @@ RSI_LEN = 14
 MACD_FAST = 12
 MACD_SLOW = 26
 MACD_SIGNAL = 9
+ATR_LEN = 14
 
-# --- FEE & RISK ---
-MAKER_FEE_RATE = 0.0  # 0.0000%
-TAKER_FEE_RATE = 0.000275  # 0.0275%
-DEFAULT_RISK_FREE_RATE = 0.0
-RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", DEFAULT_RISK_FREE_RATE))
+# --- RISK MANAGEMENT ---
+RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.05"))  # 5% annual risk-free rate
+MAX_POSITION_SIZE = 0.1  # Max 10% of capital per position
+STOP_LOSS_PCT = 0.02  # 2% stop loss
+PROFIT_TARGET_PCT = 0.04  # 4% profit target
+
+# --- TRADING RULES ---
+MIN_CONFIDENCE = 0.6  # Minimum confidence for trade execution
+MAX_LEVERAGE = 10  # Maximum leverage allowed
+MAX_DAILY_TRADES = 20  # Maximum trades per day per LLM
+
+# --- LOGGING ---
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LOG_FORMAT = "%(asctime)s | %(levelname)s | %(message)s"
