@@ -1,159 +1,136 @@
-# Modular LLM-based Quantitative Trading Bot
+# DeepSeek Paper Trading Bot
 
-This is a cryptocurrency quantitative trading bot (paper trading) that uses Large Language Models (LLM) for decision-making.
+This repository contains a paper-trading bot that runs against the Binance REST API while leveraging DeepSeek for trade decision-making. Inspired by the https://nof1.ai/ challenge. A live deployment is available at [llmtest.coininspector.pro](https://llmtest.coininspector.pro/), where you can access the dashboard and review the complete bot conversation log.
 
-The project has been refactored, breaking down the original single script into multiple independent, functionally clear modules to improve code readability, maintainability, and extensibility.
+The app persists its runtime data (portfolio state, AI messages, and trade history) inside a dedicated `data/` directory so it can be mounted as a volume when running in Docker.
 
-## Project Structure
+## Dashboard Preview
 
-The refactored project follows a modular structure:
+The Streamlit dashboard provides real-time monitoring of the trading bot's performance, displaying portfolio metrics, equity curves benchmarked against BTC buy-and-hold, trade history, and AI decision logs.
 
+### DeepSeek Trading Bot Dashboard
+![DeepSeek Trading Bot Dashboard](examples/dashboard.png)
+
+### DeepSeek Trading Bot Console
+![DeepSeek Trading Bot Console](examples/screenshot.png)
+
+## How It Works
+- Every three minutes the bot fetches fresh candles for `ETH`, `SOL`, `XRP`, `BTC`, `DOGE`, and `BNB`, updates EMA/RSI/MACD indicators, and snapshots current positions.
+- The snapshot is turned into a detailed DeepSeek prompt that includes balances, unrealised PnL, open orders, and indicator values.
+- A trading rules system prompt (see below) is sent alongside the user prompt so the model always receives the risk framework before making decisions.
+- DeepSeek replies with JSON decisions (`hold`, `entry`, or `close`) per asset. The bot enforces position sizing, places entries/closes, and persists results.
+- Portfolio state, trade history, AI requests/responses, and per-iteration console transcripts are written to `data/` for later inspection or dashboard visualisation.
+
+## System Prompt & Decision Contract
+DeepSeek is primed with a risk-first system prompt that stresses:
+- Never risking more than 1–2% of capital on a trade
+- Mandatory stop-loss orders and pre-defined exit plans
+- Favouring trend-following setups, patience, and written trade plans
+- Thinking in probabilities while keeping position sizing under control
+
+Each iteration DeepSeek receives the live portfolio snapshot and must answer **only** with JSON resembling:
+
+```json
+{
+  "ETH": {
+    "signal": "entry",
+    "side": "long",
+    "quantity": 0.5,
+    "profit_target": 3150.0,
+    "stop_loss": 2880.0,
+    "leverage": 5,
+    "confidence": 0.72,
+    "risk_usd": 150.0,
+    "invalidation_condition": "If price closes below 4h EMA20",
+    "justification": "Momentum + RSI reset on support"
+  }
+}
 ```
-.
-├── bot/                  # Core bot logic modules
-│   ├── __init__.py       # Marks bot directory as Python package
-│   ├── config.py         # Configuration loading and management
-│   ├── clients.py        # API client initialization (Binance, LLM)
-│   ├── data_processing.py  # Market data fetching and technical indicator calculations
-│   ├── prompts.py        # LLM prompt construction
-│   ├── trading_workflow.py # Core trading workflow and state management
-│   └── utils.py          # Common utility functions (logging, CSV operations)
-├── main.py               # Project main entry point
-├── dashboard.py          # Visualization monitoring dashboard
-├── pyproject.toml        # Project configuration file (for configuring uv mirror sources)
-├── requirements.txt      # Python dependencies
-├── .env                  # Environment variables file (local configuration)
-├── .env.example          # Environment variables example file
-└── data/                 # Runtime data storage (CSV logs, etc.)
-```
 
----
+If DeepSeek responds with `hold`, the bot still records unrealised PnL, accumulated fees, and the rationale in `ai_decisions.csv`.
 
-## Script Functionality Overview
+## Telegram Notifications
+Configure `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in `.env` to receive a message after every iteration. The notification mirrors the console output (positions opened/closed, portfolio summary, and any warnings) so you can follow progress without tailing logs. Leave the variables empty to run without Telegram.
 
-#### `main.py`
-The project's single entry point file. Its responsibility is very simple: import and call the main loop function from `trading_workflow` to start the bot.
+## Performance Metrics
 
-#### `dashboard.py`
-An interactive web dashboard built with Streamlit for visualizing the bot's real-time performance and historical data. See the "Visualization Dashboard" section below for details.
+The console summary and dashboard track both realized and unrealized performance:
 
-#### `pyproject.toml`
-A configuration file following PEP 621 standards. Currently mainly used to configure PyPI mirror sources for modern package management tools like `uv` to speed up and stabilize the dependency installation process.
+- **Sharpe ratio** (dashboard) is computed from closed trades using balance snapshots after each exit.
+- **Sortino ratio** (bot + dashboard) comes from the equity curve and penalises downside volatility only, making it more informative when the sample size is small.
 
-#### `bot/config.py`
-Manages all project configurations. It loads sensitive information like API keys from the `.env` file and defines static configurations such as trading pairs and technical indicator parameters. All other modules should import configuration information from this file.
+By default the Sortino ratio assumes a 0% risk-free rate. Override it by defining `SORTINO_RISK_FREE_RATE` (annualized decimal, e.g. `0.03` for 3%) or, as a fallback, `RISK_FREE_RATE` in your `.env`.
 
-#### `bot/clients.py`
-Manages all API connections to external services. It includes:
-- **Binance Client (`get_binance_client`)**: Initializes and maintains a Binance client singleton for fetching market data.
-- **LLM Client (`get_llm_client`)**: Initializes an OpenAI API-compatible client. This client is **adaptable** - you can easily switch between different model service providers (such as official OpenAI, Azure OpenAI, or any other compatible proxy service) by setting `LLM_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL_NAME` in the `.env` file.
+## Prerequisites
 
-#### `bot/data_processing.py`
-All data processing and analysis logic is centralized here. It's responsible for fetching K-line data from Binance and calculating various technical indicators (such as EMA, RSI, MACD, ATR, etc.) to provide data support for decision-making.
+- Docker 24+ (any engine capable of building Linux/AMD64 images)
+- A `.env` file with the required API credentials:
+  - `BN_API_KEY` / `BN_SECRET` for Binance access
+  - `OPENROUTER_API_KEY` for DeepSeek requests
+  - Optional: `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` for push notifications
 
-#### `bot/prompts.py`
-Specifically designed for constructing prompts sent to the large language model. It combines account status (balance, positions), detailed market data, and technical indicators into a structured, information-rich prompt that guides the LLM to make trading decisions.
-
-#### `bot/trading_workflow.py`
-This is the core of the bot. It includes:
-- **State Management (`TradingState` class)**: Tracks all dynamic states of the bot, such as cash balance, current positions, historical net value, etc.
-- **Main Trading Loop (`run_trading_loop`)**: An infinite loop that executes the complete "fetch data -> generate decision -> execute trade" process in each time cycle.
-- **Trade Execution**: Contains functions for executing specific trading logic like buy, sell, take profit, stop loss, etc. (currently placeholders that need further implementation).
-
-#### `bot/utils.py`
-Stores project-wide common utility functions to keep other modules clean. Currently includes:
-- Logging system initialization.
-- CSV file creation and write operations (for recording trades, net value, and AI decisions).
-- Telegram notification functionality.
-
----
-
-## Installation and Usage
-
-### 1. Environment Management (using uv)
-
-This project recommends using `uv` for package management, which is an extremely fast Python package installer and virtual environment manager.
-
-**a. Install uv** (if not already installed on your system)
+## Build the Image
 
 ```bash
-# macOS / Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows (PowerShell)
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+docker build -t tradebot .
 ```
 
-**b. Create and activate virtual environment**
+## Prepare Local Data Storage
 
-Run in the project root directory:
+Create a directory on the host that will receive the bot's CSV/JSON artifacts:
 
 ```bash
-# 1. Create virtual environment
-uv venv
-
-# 2. Activate virtual environment
-# macOS / Linux
-source .venv/bin/activate
-# Windows
-.venv\Scripts\activate
+mkdir -p ./data
 ```
 
-### 2. Install Dependencies
+The container stores everything under `/app/data`. Mounting your host folder to that path keeps trade history and AI logs between runs.
 
-After activating the virtual environment, use `uv` to install all dependencies listed in `requirements.txt`. The project has configured the `pyproject.toml` file, and `uv` will automatically use domestic mirror sources to speed up downloads.
+## Run the Bot in Docker
 
 ```bash
-uv pip install -r requirements.txt
+docker run --rm -it \
+  --env-file .env \
+  -v "$(pwd)/data:/app/data" \
+  tradebot
 ```
 
-### 3. Environment Configuration
+- `--env-file .env` injects API keys into the container.
+- The volume mount keeps `portfolio_state.csv`, `portfolio_state.json`, `ai_messages.csv`, `ai_decisions.csv`, and `trade_history.csv` outside the container so you can inspect them locally.
+- By default the app writes to `/app/data`. To override, set `TRADEBOT_DATA_DIR` and update the volume mount accordingly.
 
-The project manages sensitive information and environment configuration through the `.env` file.
+## Optional: Streamlit Dashboard
 
-1. Copy the `.env.example` file and rename it to `.env`.
-2. Open the `.env` file and fill in your personal information.
-
-**Required fields:**
-
-- `BN_API_KEY`: Your Binance API Key.
-- `BN_SECRET`: Your Binance Secret Key.
-- `LLM_API_KEY`: The API Key for the large language model service you're using (e.g., OpenAI's `sk-...`).
-
-**Optional fields:**
-
-- `LLM_BASE_URL`: If you're using a proxy or non-official OpenAI-compatible service, please fill in its base URL here.
-- `LLM_MODEL_NAME`: Specify the model name to use, defaults to `gpt-4o`.
-- `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`: If you want to receive Telegram notifications, please fill these in.
-
-### 4. Run the Bot
-
-After completing the configuration, simply run the `main.py` file to start the bot:
+To launch the monitoring dashboard instead of the trading bot, run:
 
 ```bash
-python main.py
+docker run --rm -it \
+  --env-file .env \
+  -v "$(pwd)/data:/app/data" \
+  -p 8501:8501 \
+  tradebot \
+  streamlit run dashboard.py
 ```
 
-After the bot starts, it will begin executing trading loops at the set time interval (default 3 minutes) and print detailed information to the console.
+Then open <http://localhost:8501> to access the UI.
 
----
+The top-level metrics include Sharpe and Sortino ratios alongside balance, equity, and PnL so you can quickly assess both realised returns and downside-adjusted performance.
 
-## Visualization Dashboard
+## Disclaimer
 
-`dashboard.py` provides an interactive web page for visualizing and monitoring the bot's performance.
+This repository is provided strictly for experimental and educational purposes. You alone choose how to use it and you bear 100% of the financial risk. I do not offer trading advice, I make no promises of profitability, and I am not responsible for any losses, damages, or missed opportunities that arise from running this project in any environment.
 
-### Main Features
+Please keep the following in mind before you deploy anything derived from this code:
 
-- **Real-time Monitoring**: Displays key metrics like total assets, return rate, position status, floating P&L, etc.
-- **Performance Analysis**: Plots asset net value curves and compares them with BTC buy-and-hold strategy.
-- **Historical Tracking**: Clearly displays each historical trade and AI decision record in table format.
+- There is no token, airdrop, or fundraising effort associated with this work; if someone claims otherwise, they are not connected to me.
+- The bot does not ship with a complete trading system. Every result depends on your own research, testing, risk controls, and execution discipline.
+- Market conditions change quickly. Past backtests, paper trades, or screenshots are not guarantees of future performance.
+- No LLM, agent, or automated component can remove the inherent risk from trading. Validate everything yourself before real capital is at stake.
 
-### How to Run
+By using this repository you acknowledge that you are solely responsible for configuring, auditing, and running it, and that you accept all associated risks.
 
-Ensure your virtual environment is activated, then run the following command in the project root directory:
+## Development Notes
 
-```bash
-streamlit run dashboard.py
-```
-
-After running, it will automatically open a local web page in your browser displaying the dashboard content.
+- The Docker image sets `PYTHONDONTWRITEBYTECODE=1` and `PYTHONUNBUFFERED=1` for cleaner logging.
+- When running locally without Docker, the bot still writes to the `data/` directory next to the source tree (or to `TRADEBOT_DATA_DIR` if set).
+- Existing files inside `data/` are never overwritten automatically; if headers or columns change, migrate the files manually.
+- The repository already includes sample CSV files in `data/` so you can explore the dashboard immediately. These files will be overwritten as the bot runs.

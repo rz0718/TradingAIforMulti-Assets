@@ -1,3 +1,0 @@
-timestamp,model,balance,equity,total_return_pct,total_trades,winning_trades,win_rate,total_pnl,positions,best_trade,worst_trade
-2025-10-28T23:20:52.409111,deepseek_v3.1,10000.0,10000.0,0.0,0,0,0,0.0,0,0.0,0.0
-2025-10-28T23:20:52.409111,qwen3_max,9000.0,9000.0,-10.0,1,0,0.0,0.0,1,0.0,0.0

@@ -329,12 +329,21 @@ def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> Non
         if pd.isna(prev_unrealized):
             prev_unrealized = prior["total_equity"] - prior["total_balance"] - prev_margin
 
-    realized_pnl = 0.0
-    if not trades_df.empty and "action" in trades_df.columns and "pnl" in trades_df.columns:
-        actions = trades_df["action"].fillna("").str.upper()
-        realized_pnl = trades_df.loc[actions == "CLOSE", "pnl"].sum(skipna=True)
-        if not np.isfinite(realized_pnl):
-            realized_pnl = 0.0
+    realized_pnl: float | None = None
+    initial_equity_series = state_df["total_equity"].dropna()
+    if not initial_equity_series.empty:
+        initial_equity = float(initial_equity_series.iloc[0])
+        realized_pnl = float(latest["total_equity"] - initial_equity)
+        if np.isfinite(unrealized_pnl):
+            realized_pnl -= float(unrealized_pnl)
+
+    if realized_pnl is None or not np.isfinite(realized_pnl):
+        realized_pnl = 0.0
+        if not trades_df.empty and "action" in trades_df.columns and "pnl" in trades_df.columns:
+            actions = trades_df["action"].fillna("").str.upper()
+            realized_pnl = trades_df.loc[actions == "CLOSE", "pnl"].sum(skipna=True)
+            if pd.isna(realized_pnl) or not np.isfinite(realized_pnl):
+                realized_pnl = 0.0
 
     sharpe_ratio = compute_sharpe_ratio(trades_df)
     sortino_ratio = compute_sortino_ratio(state_df, RISK_FREE_RATE)
