@@ -14,6 +14,8 @@ from colorama import Fore, Style
 
 from . import clients, config, data_processing, prompts, utils
 
+from openai import OpenAI
+
 
 class TradingState:
     """Manages the full state of the trading bot."""
@@ -76,9 +78,15 @@ class TradingState:
             "net_unrealized_pnl": net_unrealized_pnl,
         }
 
-def get_llm_decisions(state: TradingState, market_snapshots: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def get_llm_decisions(state: TradingState, market_snapshots: Dict[str, Any], model_name: str) -> Optional[Dict[str, Any]]:
     """Calls the LLM API and returns trading decisions."""
-    llm_client = clients.get_llm_client()
+    api_key = config.OPENROUTER_API_KEY
+    if not api_key:
+        logging.error("❌ OPENROUTER_API_KEY is not loaded!")
+    else:
+        logging.info(f"✅ OPENROUTER_API_KEY loaded (length: {len(api_key)})")
+                
+    llm_client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
     if not llm_client:
         logging.error("LLM client is not available.")
         return None
@@ -88,15 +96,16 @@ def get_llm_decisions(state: TradingState, market_snapshots: Dict[str, Any]) -> 
     try:
         utils.log_ai_message({
             'timestamp': datetime.now().isoformat(), 'direction': "sent", 'role': "system",
-            'content': prompts.TRADING_RULES_PROMPT, 'metadata': {"model": config.LLM_MODEL_NAME}
+            'content': prompts.TRADING_RULES_PROMPT, 'metadata': {"model":model_name}
         })
         utils.log_ai_message({
             'timestamp': datetime.now().isoformat(), 'direction': "sent", 'role': "user",
-            'content': prompt, 'metadata': {"model": config.LLM_MODEL_NAME}
+            'content': prompt, 'metadata': {"model": model_name}
         })
+        model_config = config.LLM_MODELS[model_name]
 
         response = llm_client.chat.completions.create(
-            model=config.LLM_MODEL_NAME,
+            model=model_config["model_id"],
             messages=[
                 {"role": "system", "content": prompts.TRADING_RULES_PROMPT},
                 {"role": "user", "content": prompt}
@@ -121,15 +130,100 @@ def get_llm_decisions(state: TradingState, market_snapshots: Dict[str, Any]) -> 
         logging.error(f"Error calling LLM API: {e}", exc_info=True)
         return None
 
+def check_stop_loss_take_profit(state: TradingState, market_snapshots: Dict[str, Any]):
+    """Check and execute stop loss / take profit for all positions."""
+    for coin in list(state.positions.keys()):
+        if coin not in market_snapshots:
+            continue
+            
+        current_price = market_snapshots[coin]['price']
+        pos = state.positions[coin]
+        
+        # Check stop loss
+        if pos['side'] == 'long' and current_price <= pos['stop_loss']:
+            execute_trade(state, coin, {'signal': 'close', 'justification': 'Stop loss hit'}, current_price)
+        elif pos['side'] == 'short' and current_price >= pos['stop_loss']:
+            execute_trade(state, coin, {'signal': 'close', 'justification': 'Stop loss hit'}, current_price)
+        
+        # Check take profit
+        elif pos['side'] == 'long' and current_price >= pos['profit_target']:
+            execute_trade(state, coin, {'signal': 'close', 'justification': 'Take profit hit'}, current_price)
+        elif pos['side'] == 'short' and current_price <= pos['profit_target']:
+            execute_trade(state, coin, {'signal': 'close', 'justification': 'Take profit hit'}, current_price)
+
+def calculate_unrealized_pnl(coin: str, current_price: float, pos: Dict[str, Any]) -> float:
+    """Calculate unrealized PnL for a position."""
+    if pos['side'] == 'long':
+        return (current_price - pos['entry_price']) * pos['quantity']
+    else:  # short
+        return (pos['entry_price'] - current_price) * pos['quantity']
+
 def execute_trade(state: TradingState, coin: str, decision: Dict[str, Any], price: float):
     """Executes a single trade based on an LLM decision."""
     # ... (Implementation of execute_entry and execute_close from original bot.py)
     # This function would be much larger in a real implementation.
     logging.info(f"Executing trade for {coin} based on signal: {decision.get('signal')}")
-    # For now, we just log the intent.
-    pass # Placeholder
+    signal = decision.get('signal')
+    if signal == 'entry':
+        # valid no existing position
+        if coin in state.positions:
+            logging.warning(f"Already have position for {coin}, skipping entry")
+            return
+      
+        # extract decision parameters 
+        side = decision.get('side', 'hold')
+        leverage = decision.get('leverage', 10)
+        quantity = decision.get('quantity', 0.0)
+        profit_target = decision.get('profit_target', 0.0)
+        stop_loss = decision.get('stop_loss', 0.0)
+        # Calculate position size based on risk
+        stop_distance = abs(price - stop_loss)
+        if stop_distance == 0:
+            logging.warning(f"{coin}: Invalid stop loss, skipping")
+            return
+            
+        position_value = quantity * price
+        margin_required = position_value / leverage
+        
+        # Check sufficient balance
+        if margin_required > state.balance:
+            logging.warning(f"{coin}: Insufficient balance for margin")
+            return
 
-def run_trading_loop():
+        # Create position
+        state.positions[coin] = {
+            'side': side,
+            'quantity': quantity,
+            'entry_price': price,
+            'profit_target': profit_target,
+            'stop_loss': stop_loss,
+            'leverage': leverage,
+            'confidence': decision.get('confidence', 0.5),
+            'margin': margin_required,
+            'invalidation_condition': decision.get('invalidation_condition', ''),
+            'justification': decision.get('justification', ''),
+        }
+        
+        # Update balance
+        state.balance -= margin_required
+        logging.info(f"ENTRY: {coin} {side.upper()} {quantity:.4f} @ ${price:.4f}")
+
+    elif signal == 'close':
+        if coin not in state.positions:
+            logging.warning(f"{coin}: No position to close")
+            return
+            
+        pos = state.positions[coin]
+        pnl = calculate_unrealized_pnl(coin, price, pos)
+        
+        # Return margin + PnL
+        state.balance += pos['margin'] + pnl
+        
+        logging.info(f"CLOSE: {coin} {pos['side'].upper()} @ ${price:.4f} | PnL: ${pnl:.2f}")
+        
+        # Remove position
+        del state.positions[coin]
+def run_trading_loop(model_name: str):
     """The main event loop for the trading bot."""
     utils.setup_logging()
     utils.init_csv_files()
@@ -165,9 +259,12 @@ def run_trading_loop():
             if len(market_snapshots) != len(config.SYMBOLS):
                 logging.warning("Failed to fetch market data for one or more symbols.")
 
+            logging.info("Checking stop loss / take profit...")
+            check_stop_loss_take_profit(state, market_snapshots)
+
             # 2. Get LLM decisions
             logging.info("Requesting trading decisions from LLM...")
-            decisions = get_llm_decisions(state, market_snapshots)
+            decisions = get_llm_decisions(state, market_snapshots, model_name)
 
             # 3. Execute trades
             if decisions:

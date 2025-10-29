@@ -5,17 +5,7 @@ Main entry point for the multi-LLM trading bot.
 
 import asyncio
 from dotenv import load_dotenv
-from bot.multi_trading_workflow import MultiTradingWorkflow
-
+from bot.trading_workflow import run_trading_loop
 # Load environment variables from .env file
-load_dotenv()
-
-
-async def main():
-    """Main entry point for multi-LLM trading system."""
-    workflow = MultiTradingWorkflow()
-    await workflow.run_trading_loop()
-
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    run_trading_loop("deepseek_v3.1")
