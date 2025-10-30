@@ -417,9 +417,11 @@ class MultiBotManager:
             perf = self.get_bot_performance(bot_id)
             if perf:
                 snapshot['bots'][bot_id] = perf.to_dict()
-        
+                self.bots[bot_id].performance = perf.to_dict()
+
         self.performance_snapshots.append(snapshot)
         self.save_performance_history()
+
     
     def save_performance_history(self) -> None:
         """Save performance history to JSON file."""

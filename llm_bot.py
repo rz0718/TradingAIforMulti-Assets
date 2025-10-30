@@ -134,6 +134,7 @@ class LLMBot:
         self.MESSAGES_COLUMNS = [
             'timestamp', 'direction', 'role', 'content', 'metadata'
         ]
+        self.performance = {}
 
     def init_csv_files(self) -> None:
         """Initialize CSV files with headers."""
@@ -466,11 +467,25 @@ class LLMBot:
                 "liquidation_price": liquidation_price,
                 "unrealized_pnl": gross_unrealized,
                 "leverage": pos.get("leverage", 1),
+                "exit_plan": {
+                    "profit_target": pos.get("profit_target"),
+                    "stop_loss": pos.get("stop_loss"),
+                    "invalidation_condition": pos.get("invalidation_condition"),
+                },
+                "confidence": pos.get("confidence", 0.0),
+                "risk_usd": pos.get("risk_usd"),
+                "sl_oid": pos.get("sl_oid", -1),
+                "tp_oid": pos.get("tp_oid", -1),
+                "wait_for_fill": pos.get("wait_for_fill", False),
+                "entry_oid": pos.get("entry_oid", -1),
+                "notional_usd": notional_value,
             }
             prompt_lines.append(f"{coin} position data: {json.dumps(position_payload)}")
 
-        sharpe_ratio = 0.0
-        prompt_lines.append(f"Sharpe Ratio: {fmt(sharpe_ratio, 3)}")
+        # sharpe_ratio = 0.0
+        sharpe_ratio = self.performance.get("sharpe_ratio", None)
+        if sharpe_ratio is not None:
+            prompt_lines.append(f"Sharpe Ratio: {fmt(sharpe_ratio, 3)}")
 
         prompt_lines.append(
             """
@@ -561,7 +576,7 @@ IMPORTANT:
                 timeout=30
             )
 
-            print(response.json())
+            # print(response.json())
             if response.status_code != 200:
                 self.notify_error(
                     f"OpenRouter API error: {response.status_code}",
