@@ -23,8 +23,9 @@ def main():
     bot_ids = []
     
     # Example: Add multiple instances of the same model with different IDs
-    bot_ids.append(manager.add_bot("deepseek/deepseek-chat-v3.1", "deepseek-1"))
-    bot_ids.append(manager.add_bot("qwen/qwen3-max", "qwen-1"))
+    bot_ids.append(manager.add_bot("deepseek/deepseek-chat-v3.1", "deepseek-2"))
+    bot_ids.append(manager.add_bot("qwen/qwen3-max", "qwen-2"))
+    # bot_ids.append(manager.add_bot("anthropic/claude-4.5-sonnet", "claude-1"))
     
     # Or add different models to compare
     # bot_ids.append(manager.add_bot("anthropic/claude-3.5-sonnet", "claude-1"))

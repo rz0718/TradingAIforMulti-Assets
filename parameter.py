@@ -1,5 +1,5 @@
 INTERVAL = "3m"  # 3-minute candles as per DeepSeek example
-START_CAPITAL = 10000.0
+START_CAPITAL = 500000.0
 CHECK_INTERVAL = 180  # Check every 3 minutes (when candle closes)
 DEFAULT_RISK_FREE_RATE = 0.0  # Annualized baseline for Sortino ratio calculations
 

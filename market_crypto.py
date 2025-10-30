@@ -4,29 +4,80 @@ import numpy as np
 import logging
 from parameter import INTERVAL, EMA_LEN, RSI_LEN, MACD_FAST, MACD_SLOW, MACD_SIGNAL
 from indicators import calculate_indicators, calculate_atr_series, add_indicator_columns
-from config import SYMBOL_TO_COIN, API_KEY, API_SECRET
-print(SYMBOL_TO_COIN)
-import yfinance as yf
+from config import SYMBOL_TO_COIN
+from config import API_KEY, API_SECRET
+from binance.client import Client
 from requests.exceptions import RequestException, Timeout
 
+client: Optional[Client] = None
+
+def get_binance_client() -> Optional[Client]:
+    """Return a connected Binance client or None if initialization failed."""
+    global client
+
+    if client is not None:
+        return client
+
+    if not API_KEY or not API_SECRET:
+        logging.error("BN_API_KEY and/or BN_SECRET missing; unable to initialize Binance client.")
+        return None
+
+    try:
+        logging.info("Attempting to initialize Binance client...")
+        client = Client(API_KEY, API_SECRET, testnet=False)
+        logging.info("Binance client initialized successfully.")
+    except Timeout as exc:
+        logging.warning(
+            "Timed out while connecting to Binance API: %s. Will retry automatically without exiting.",
+            exc,
+        )
+        client = None
+    except RequestException as exc:
+        logging.error(
+            "Network error while connecting to Binance API: %s. Will retry automatically.",
+            exc,
+        )
+        client = None
+    except Exception as exc:
+        logging.error(
+            "Unexpected error while initializing Binance client: %s",
+            exc,
+            exc_info=True,
+        )
+        client = None
+
+    return client
 
 
 def fetch_market_data(symbol: str) -> Optional[Dict[str, Any]]:
     """Fetch current market data for a symbol."""
+    binance_client = get_binance_client()
+    if not binance_client:
+        logging.warning("Skipping market data fetch for %s: Binance client unavailable.", symbol)
+        return None
+
     try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(interval="1m", period="7d").tail(150)
-        df = df.resample('3T').last()
+        # Get recent klines
+        klines = binance_client.get_klines(symbol=symbol, interval=INTERVAL, limit=50)
         
-        df['close'] = df['Close'].astype(float)
-        df['high'] = df['High'].astype(float)
-        df['low'] = df['Low'].astype(float)
-        df['open'] = df['Open'].astype(float)
+        df = pd.DataFrame(klines, columns=[
+            'timestamp', 'open', 'high', 'low', 'close', 'volume',
+            'close_time', 'quote_volume', 'trades', 'taker_base', 'taker_quote', 'ignore'
+        ])
+        
+        df['close'] = df['close'].astype(float)
+        df['high'] = df['high'].astype(float)
+        df['low'] = df['low'].astype(float)
+        df['open'] = df['open'].astype(float)
         
         last = calculate_indicators(df)
         
         # Get funding rate for perpetual futures
-        funding_rate = 0
+        try:
+            funding_info = binance_client.futures_funding_rate(symbol=symbol, limit=1)
+            funding_rate = float(funding_info[0]['fundingRate']) if funding_info else 0
+        except:
+            funding_rate = 0
         
         return {
             'symbol': symbol,
@@ -61,18 +112,29 @@ def round_series(values: Iterable[Any], precision: int) -> List[float]:
 
 def collect_prompt_market_data(symbol: str) -> Optional[Dict[str, Any]]:
     """Return rich market snapshot for prompt composition."""
+    binance_client = get_binance_client()
+    if not binance_client:
+        return None
 
     try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(interval="1m", period="7d").tail(600)
-        df = df.resample('3T').last()
-        df['close'] = df['Close'].astype(float)
-        df['high'] = df['High'].astype(float)
-        df['low'] = df['Low'].astype(float)
-        df['open'] = df['Open'].astype(float)
-        df["volume"] = df['Volume'].astype(float)
-
-        df_intraday = df.copy()
+        intraday_klines = binance_client.get_klines(symbol=symbol, interval=INTERVAL, limit=200)
+        df_intraday = pd.DataFrame(
+            intraday_klines,
+            columns=[
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "close_time",
+                "quote_volume",
+                "trades",
+                "taker_base",
+                "taker_quote",
+                "ignore",
+            ],
+        )
 
         numeric_cols = ["open", "high", "low", "close", "volume"]
         df_intraday[numeric_cols] = df_intraday[numeric_cols].astype(float)
@@ -84,13 +146,23 @@ def collect_prompt_market_data(symbol: str) -> Optional[Dict[str, Any]]:
             macd_params=(MACD_FAST, MACD_SLOW, MACD_SIGNAL),
         )
 
-        df_long = ticker.history(interval='4h', period='3mo').tail(200)
-        df_long['open'] = df_long['Open'].astype(float)
-        df_long['high'] = df_long['High'].astype(float)
-        df_long['low'] = df_long['Low'].astype(float)
-        df_long['close'] = df_long['Close'].astype(float)
-        df_long['volume'] = df_long['Volume'].astype(float)
-        
+        df_long = pd.DataFrame(
+            binance_client.get_klines(symbol=symbol, interval="4h", limit=200),
+            columns=[
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "close_time",
+                "quote_volume",
+                "trades",
+                "taker_base",
+                "taker_quote",
+                "ignore",
+            ],
+        )
         df_long[numeric_cols] = df_long[numeric_cols].astype(float)
         df_long = add_indicator_columns(
             df_long,
@@ -101,10 +173,19 @@ def collect_prompt_market_data(symbol: str) -> Optional[Dict[str, Any]]:
         df_long["atr3"] = calculate_atr_series(df_long, 3)
         df_long["atr14"] = calculate_atr_series(df_long, 14)
 
+        try:
+            oi_hist = binance_client.futures_open_interest_hist(symbol=symbol, period="5m", limit=30)
+            open_interest_values = [float(entry["sumOpenInterest"]) for entry in oi_hist]
+        except Exception as exc:
+            logging.debug("Open interest history unavailable for %s: %s", symbol, exc)
+            open_interest_values = []
 
-        open_interest_values = []
-    
-        funding_rates = []
+        try:
+            funding_hist = binance_client.futures_funding_rate(symbol=symbol, limit=30)
+            funding_rates = [float(entry["fundingRate"]) for entry in funding_hist]
+        except Exception as exc:
+            logging.debug("Funding rate history unavailable for %s: %s", symbol, exc)
+            funding_rates = []
 
         price = float(df_intraday["close"].iloc[-1])
         ema20 = float(df_intraday["ema20"].iloc[-1])
@@ -158,7 +239,3 @@ def collect_prompt_market_data(symbol: str) -> Optional[Dict[str, Any]]:
     except Exception as exc:
         logging.error("Failed to build market snapshot for %s: %s", symbol, exc, exc_info=True)
         return None
-
-if __name__ == "__main__":
-    print(fetch_market_data("MSFT"))
-    print(collect_prompt_market_data("MSFT"))

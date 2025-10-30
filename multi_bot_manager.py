@@ -156,12 +156,12 @@ class MultiBotManager:
                         bot.iteration_counter += 1
                         bot.current_iteration_messages = []
                         
-                        from market import get_binance_client
-                        if not get_binance_client():
-                            retry_delay = min(CHECK_INTERVAL, 60)
-                            logger.warning(f"Bot '{bot_id}': Binance client unavailable; retrying in {retry_delay}s")
-                            time.sleep(retry_delay)
-                            continue
+                        # from market import get_binance_client
+                        # if not get_binance_client():
+                        #     retry_delay = min(CHECK_INTERVAL, 60)
+                        #     logger.warning(f"Bot '{bot_id}': Binance client unavailable; retrying in {retry_delay}s")
+                        #     time.sleep(retry_delay)
+                        #     continue
                         
                         # Check stop loss / take profit
                         bot.check_stop_loss_take_profit()

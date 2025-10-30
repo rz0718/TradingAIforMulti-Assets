@@ -26,7 +26,8 @@ from prompt import TRADING_RULES_PROMPT
 from parameter import INTERVAL, START_CAPITAL, DEFAULT_RISK_FREE_RATE, EMA_LEN, RSI_LEN, MACD_FAST, MACD_SLOW, MACD_SIGNAL, MAKER_FEE_RATE, TAKER_FEE_RATE, CHECK_INTERVAL
 from config import API_KEY, API_SECRET, OPENROUTER_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, SYMBOLS, SYMBOL_TO_COIN
 from telegram import send_telegram_message
-from market import fetch_market_data, collect_prompt_market_data, get_binance_client
+# from market import fetch_market_data, collect_prompt_market_data, get_binance_client
+from market import fetch_market_data, collect_prompt_market_data
 from indicators import calculate_indicators, calculate_atr_series, add_indicator_columns
 
 
@@ -805,7 +806,7 @@ IMPORTANT:
             rr_display = f"{rr_value:.2f}:1"
         else:
             rr_display = "n/a"
-        line = f"{Fore.GREEN}[ENTRY] {coin} {side.upper()} {leverage_display} @ ${entry_price:.4f}"
+        line = f"{Fore.GREEN}{self.model},{self.bot_id}: [ENTRY] {coin} {side.upper()} {leverage_display} @ ${entry_price:.4f}"
         print(line)
         self.record_iteration_message(line)
         line = f"  ├─ Size: {quantity:.4f} {coin} | Margin: ${margin_required:.2f}"
@@ -878,7 +879,7 @@ IMPORTANT:
         net_pnl = pnl - total_fees
         self.balance += pos['margin'] + net_pnl
         color = Fore.GREEN if net_pnl >= 0 else Fore.RED
-        line = f"{color}[CLOSE] {coin} {pos['side'].upper()} {pos['quantity']:.4f} @ ${current_price:.4f}"
+        line = f"{color}{self.model},{self.bot_id}: [CLOSE] {coin} {pos['side'].upper()} {pos['quantity']:.4f} @ ${current_price:.4f}"
         print(line)
         self.record_iteration_message(line)
         line = f"  ├─ Entry: ${pos['entry_price']:.4f} | Gross PnL: ${pnl:.2f}"
@@ -956,14 +957,14 @@ IMPORTANT:
                 self.iteration_counter += 1
                 self.current_iteration_messages = []
                 
-                if not get_binance_client():
-                    retry_delay = min(CHECK_INTERVAL, 60)
-                    logging.warning(
-                        "Binance client unavailable; retrying in %d seconds without exiting.",
-                        retry_delay,
-                    )
-                    time.sleep(retry_delay)
-                    continue
+                # if not get_binance_client():
+                #     retry_delay = min(CHECK_INTERVAL, 60)
+                #     logging.warning(
+                #         "Binance client unavailable; retrying in %d seconds without exiting.",
+                #         retry_delay,
+                #     )
+                #     time.sleep(retry_delay)
+                #     continue
                 
                 line = f"\n{Fore.CYAN}{'='*20}"
                 print(line)

@@ -18,12 +18,12 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # Trading symbols to monitor
-SYMBOLS = ["NVDA", "MSFT", "AAPL", "GOOG", "AMZN", "TSLA"]
+SYMBOLS = ["ETHUSDT", "SOLUSDT", "XRPUSDT", "BTCUSDT", "DOGEUSDT", "BNBUSDT"]
 SYMBOL_TO_COIN = {
-    "NVDA": "NVDA",
-    "MSFT": "MSFT",
-    "AAPL": "AAPL",
-    "GOOG": "GOOG",
-    "AMZN": "AMZN",
-    "TSLA": "TSLA"
+    "ETHUSDT": "ETH",
+    "SOLUSDT": "SOL", 
+    "XRPUSDT": "XRP",
+    "BTCUSDT": "BTC",
+    "DOGEUSDT": "DOGE",
+    "BNBUSDT": "BNB"
 }
