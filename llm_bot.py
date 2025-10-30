@@ -531,7 +531,7 @@ IMPORTANT:
                 metadata={
                     "model": self.model,
                     "temperature": 0.7,
-                    "max_tokens": 4000
+                    "max_tokens": 6000
                 }
             )
             self.log_ai_message(
@@ -541,7 +541,7 @@ IMPORTANT:
                 metadata={
                     "model": self.model,
                     "temperature": 0.7,
-                    "max_tokens": 4000
+                    "max_tokens": 6000
                 }
             )
             response = requests.post(
@@ -568,7 +568,7 @@ IMPORTANT:
                     "max_tokens": 6000,
                     "reasoning":
                     {
-                        "effort": "medium",
+                        "effort": "low",
                         "exclude": False,
                         "enabled": True,
                     }
@@ -608,7 +608,7 @@ IMPORTANT:
                 except json.JSONDecodeError as decode_err:
                     snippet = json_str[:2000]
                     self.notify_error(
-                        f"DeepSeek JSON decode failed: {decode_err}",
+                        f"{self.model} JSON decode failed: {decode_err}",
                         metadata={
                             "response_id": result.get("id"),
                             "status_code": response.status_code,
@@ -618,7 +618,7 @@ IMPORTANT:
                     return None
             else:
                 self.notify_error(
-                    "No JSON found in DeepSeek response",
+                    f"No JSON found in {self.model} response",
                     metadata={
                         "response_id": result.get("id"),
                         "status_code": response.status_code,
@@ -1002,6 +1002,7 @@ IMPORTANT:
                 if not decisions:
                     logging.warning("No decisions received from AI")
                 else:
+                    print(decisions)
                     # Process decisions for each coin
                     for coin in SYMBOL_TO_COIN.values():
                         if coin not in decisions:

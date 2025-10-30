@@ -172,6 +172,7 @@ class MultiBotManager:
                         decisions = bot.call_llm_api(prompt)
                         
                         if decisions:
+                            print(bot.model, bot.bot_id, decisions)
                             from config import SYMBOL_TO_COIN
                             from market import fetch_market_data
                             
@@ -209,8 +210,112 @@ class MultiBotManager:
                                         pos = bot.positions[coin]
                                         raw_reason = str(decision.get('justification', '')).strip()
                                         if raw_reason:
-                                            pos['last_justification'] = " ".join(raw_reason.split())
-                        
+                                            reason_text = " ".join(raw_reason.split())
+                                            pos['last_justification'] = reason_text
+                                        else:
+                                            existing_reason = str(pos.get('last_justification', '')).strip()
+                                            reason_text = existing_reason or "No justification provided."
+                                            if not existing_reason:
+                                                pos['last_justification'] = reason_text
+                                        try:
+                                            quantity = float(pos.get('quantity', 0.0))
+                                        except (TypeError, ValueError):
+                                            quantity = 0.0
+                                        try:
+                                            fees_paid = float(pos.get('fees_paid', 0.0))
+                                        except (TypeError, ValueError):
+                                            fees_paid = 0.0
+                                        try:
+                                            entry_price = float(pos.get('entry_price', 0.0))
+                                        except (TypeError, ValueError):
+                                            entry_price = 0.0
+                                        try:
+                                            target_price = float(pos.get('profit_target', entry_price))
+                                        except (TypeError, ValueError):
+                                            target_price = entry_price
+                                        try:
+                                            stop_price = float(pos.get('stop_loss', entry_price))
+                                        except (TypeError, ValueError):
+                                            stop_price = entry_price
+                                        leverage_display = bot.format_leverage_display(pos.get('leverage', 1.0))
+                                        try:
+                                            margin_value = float(pos.get('margin', 0.0))
+                                        except (TypeError, ValueError):
+                                            margin_value = 0.0
+                                        try:
+                                            risk_value = float(pos.get('risk_usd', 0.0))
+                                        except (TypeError, ValueError):
+                                            risk_value = 0.0
+                                        gross_unrealized = bot.calculate_unrealized_pnl(coin, current_price)
+                                        estimated_exit_fee_now = bot.estimate_exit_fee(pos, current_price)
+                                        total_fees_now = fees_paid + estimated_exit_fee_now
+                                        net_unrealized = gross_unrealized - total_fees_now
+                                        gross_at_target = bot.calculate_pnl_for_price(pos, target_price)
+                                        exit_fee_target = bot.estimate_exit_fee(pos, target_price)
+                                        net_at_target = gross_at_target - (fees_paid + exit_fee_target)
+                                        gross_at_stop = bot.calculate_pnl_for_price(pos, stop_price)
+                                        exit_fee_stop = bot.estimate_exit_fee(pos, stop_price)
+                                        net_at_stop = gross_at_stop - (fees_paid + exit_fee_stop)
+                                        expected_reward = max(gross_at_target, 0.0)
+                                        expected_risk = max(-gross_at_stop, 0.0)
+                                        if expected_risk > 0:
+                                            rr_value = expected_reward / expected_risk if expected_reward > 0 else 0.0
+                                            rr_display = f"{rr_value:.2f}:1"
+                                        else:
+                                            rr_display = "n/a"
+                                        pnl_color = Fore.GREEN if net_unrealized >= 0 else Fore.RED
+                                        net_sign = '+' if net_unrealized >= 0 else '-'
+                                        net_display = f"{net_sign}${abs(net_unrealized):.2f}"
+                                        gross_sign = '+' if gross_unrealized >= 0 else '-'
+                                        gross_display = f"{gross_sign}${abs(gross_unrealized):.2f}"
+                                        
+                                        gross_target_sign = '+' if gross_at_target >= 0 else '-'
+                                        gross_target_display = f"{gross_target_sign}${abs(gross_at_target):.2f}"
+                                        gross_stop_sign = '+' if gross_at_stop >= 0 else '-'
+                                        gross_stop_display = f"{gross_stop_sign}${abs(gross_at_stop):.2f}"
+
+                                        net_target_sign = '+' if net_at_target >= 0 else '-'
+                                        net_target_display = f"{net_target_sign}${abs(net_at_target):.2f}"
+                                        net_stop_sign = '+' if net_at_stop >= 0 else '-'
+                                        net_stop_display = f"{net_stop_sign}${abs(net_at_stop):.2f}"
+
+                                        line = (
+                                            f"[HOLD] {coin} {pos['side'].upper()} {leverage_display} @ ${entry_price:.4f} | "
+                                            f"Current: ${current_price:.4f}"
+                                        )
+                                        print(line)
+                                        bot.record_iteration_message(line)
+                                        line = f"  ├─ Size: {quantity:.4f} {coin} | Margin: ${margin_value:.2f}"
+                                        print(line)
+                                        bot.record_iteration_message(line)
+                                        line = f"  ├─ TP: ${target_price:.4f} | SL: ${stop_price:.4f}"
+                                        print(line)
+                                        bot.record_iteration_message(line)
+                                        line = (
+                                            f"  ├─ PnL: {pnl_color}{net_display}{Style.RESET_ALL} "
+                                            f"(Gross: {gross_display}, Fees: ${total_fees_now:.2f})"
+                                        )
+                                        print(line)
+                                        bot.record_iteration_message(line)
+                                        line = (
+                                            f"  ├─ PnL @ Target: {gross_target_display} "
+                                            f"(Net: {net_target_display})"
+                                        )
+                                        print(line)
+                                        bot.record_iteration_message(line)
+                                        line = (
+                                            f"  ├─ PnL @ Stop: {gross_stop_display} "
+                                            f"(Net: {net_stop_display})"
+                                        )
+                                        print(line)
+                                        bot.record_iteration_message(line)
+                                        line = f"  ├─ Reward/Risk: {rr_display}"
+                                        print(line)
+                                        bot.record_iteration_message(line)
+                                        line = f"  └─ Reason: {reason_text}"
+                                        print(line)
+                                        bot.record_iteration_message(line)
+
                         # Calculate and log portfolio summary
                         from parameter import START_CAPITAL, CHECK_INTERVAL, DEFAULT_RISK_FREE_RATE
                         from colorama import Fore, Style
