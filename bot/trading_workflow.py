@@ -6,13 +6,14 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Iterable
 
 import numpy as np
 import pandas as pd
 from colorama import Fore, Style
 
-from . import clients, config, data_processing, prompts, utils
+from . import clients, config, data_processing, utils
+from . import prompts_v1 as prompts
 
 from openai import OpenAI
 
@@ -67,6 +68,16 @@ class TradingState:
         total_return_pct = ((total_equity - config.START_CAPITAL) / config.START_CAPITAL) * 100
         net_unrealized_pnl = total_equity - self.balance - total_margin
 
+        # Add equity to history for ratio calculations
+        self.equity_history.append(total_equity)
+        
+        # Calculate Sharpe and Sortino ratios
+        sharpe_ratio = calculate_sharpe_ratio(
+            self.equity_history, 
+            config.CHECK_INTERVAL, 
+            config.RISK_FREE_RATE
+        )
+
         return {
             "balance": self.balance,
             "positions": self.positions,
@@ -76,6 +87,7 @@ class TradingState:
             "total_margin": total_margin,
             "total_return_pct": total_return_pct,
             "net_unrealized_pnl": net_unrealized_pnl,
+            "sharpe_ratio": sharpe_ratio
         }
 
 def get_llm_decisions(state: TradingState, market_snapshots: Dict[str, Any], model_name: str) -> Optional[Dict[str, Any]]:
@@ -158,6 +170,50 @@ def calculate_unrealized_pnl(coin: str, current_price: float, pos: Dict[str, Any
     else:  # short
         return (pos['entry_price'] - current_price) * pos['quantity']
 
+
+def calculate_sharpe_ratio(
+    equity_values: Iterable[float],
+    period_seconds: float,
+    risk_free_rate: float = config.RISK_FREE_RATE,
+) -> Optional[float]:
+    """
+    Compute the annualized Sharpe ratio from equity snapshots.
+    
+    Args:
+        equity_values: Sequence of equity values in chronological order.
+        period_seconds: Average period between snapshots (used to annualize).
+        risk_free_rate: Annualized risk-free rate (decimal form).
+    """
+    values = [float(v) for v in equity_values if isinstance(v, (int, float, np.floating)) and np.isfinite(v)]
+    if len(values) < 2:
+        return None
+
+    returns = np.diff(values) / np.array(values[:-1], dtype=float)
+    returns = returns[np.isfinite(returns)]
+    if returns.size == 0:
+        return None
+
+    period_seconds = float(period_seconds) if period_seconds and period_seconds > 0 else config.CHECK_INTERVAL
+    periods_per_year = (365 * 24 * 60 * 60) / period_seconds
+    if not np.isfinite(periods_per_year) or periods_per_year <= 0:
+        return None
+
+    per_period_rf = risk_free_rate / periods_per_year
+    excess_return = returns.mean() - per_period_rf
+    if not np.isfinite(excess_return):
+        return None
+
+    return_std = np.std(returns)
+    if return_std <= 0 or not np.isfinite(return_std):
+        return None
+
+    sharpe = (excess_return / return_std) * np.sqrt(periods_per_year)
+    if not np.isfinite(sharpe):
+        return None
+    return float(sharpe)
+
+
+
 def execute_trade(state: TradingState, coin: str, decision: Dict[str, Any], price: float):
     """Executes a single trade based on an LLM decision."""
     # ... (Implementation of execute_entry and execute_close from original bot.py)
@@ -176,6 +232,7 @@ def execute_trade(state: TradingState, coin: str, decision: Dict[str, Any], pric
         quantity = decision.get('quantity', 0.0)
         profit_target = decision.get('profit_target', 0.0)
         stop_loss = decision.get('stop_loss', 0.0)
+        risk_usd = decision.get('risk_usd', 0.0)
         # Calculate position size based on risk
         stop_distance = abs(price - stop_loss)
         if stop_distance == 0:
@@ -200,6 +257,7 @@ def execute_trade(state: TradingState, coin: str, decision: Dict[str, Any], pric
             'leverage': leverage,
             'confidence': decision.get('confidence', 0.5),
             'margin': margin_required,
+            "risk_usd": risk_usd,
             'invalidation_condition': decision.get('invalidation_condition', ''),
             'justification': decision.get('justification', ''),
         }
@@ -207,6 +265,21 @@ def execute_trade(state: TradingState, coin: str, decision: Dict[str, Any], pric
         # Update balance
         state.balance -= margin_required
         logging.info(f"ENTRY: {coin} {side.upper()} {quantity:.4f} @ ${price:.4f}")
+        utils.log_trade({
+            'timestamp': datetime.now().isoformat(),
+            'coin': coin,
+            'action': 'ENTRY',
+            'side': side,
+            'quantity': quantity,
+            'price': price,
+            'profit_target': profit_target,
+            'stop_loss': stop_loss,
+            'leverage': leverage,
+            'confidence': decision.get('confidence', 0.5),
+            'pnl': 0.0,  # No PnL on entry
+            'balance_after': state.balance,
+            'reason': decision.get('justification', 'AI entry signal')
+        })
 
     elif signal == 'close':
         if coin not in state.positions:
@@ -221,8 +294,24 @@ def execute_trade(state: TradingState, coin: str, decision: Dict[str, Any], pric
         
         logging.info(f"CLOSE: {coin} {pos['side'].upper()} @ ${price:.4f} | PnL: ${pnl:.2f}")
         
+        utils.log_trade({
+            'timestamp': datetime.now().isoformat(),
+            'coin': coin,
+            'action': 'CLOSE',
+            'side': pos['side'],
+            'quantity': pos['quantity'],
+            'price': price,
+            'profit_target': pos['profit_target'],
+            'stop_loss': pos['stop_loss'],
+            'leverage': pos['leverage'],
+            'confidence': pos['confidence'],
+            'pnl': pnl,
+            'balance_after': state.balance,
+            'reason': decision.get('justification', 'AI close signal')
+        })
         # Remove position
         del state.positions[coin]
+
 def run_trading_loop(model_name: str):
     """The main event loop for the trading bot."""
     utils.setup_logging()
@@ -286,7 +375,6 @@ def run_trading_loop(model_name: str):
             # 4. Log and display summary
             summary = state.get_summary(market_snapshots)
             utils.log_portfolio_state(summary)
-            # ... (Display summary logic)
 
             # 5. Wait for next interval
             logging.info(f"Waiting {config.CHECK_INTERVAL} seconds...")
