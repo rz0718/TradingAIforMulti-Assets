@@ -369,7 +369,7 @@ def create_trading_prompt(
             f"- Total Return (%): {fmt(state['total_return_pct'], 2)}",
             f"- Sharpe Ratio: {fmt(state['sharpe_ratio'], 2)}",
             "**Account Status:**",
-            f"- Available Cash: {fmt(state['balance'], 2)}",
+            f"- Available Cash: {fmt(state['total_balance'], 2)}",
             f"- Unrealized PnL: {fmt(state['net_unrealized_pnl'], 2)}",
             f"- Current Account Value: {fmt(state['total_equity'], 2)}",
             "Open positions and their performance details:",

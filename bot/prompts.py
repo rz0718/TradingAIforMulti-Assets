@@ -125,7 +125,7 @@ def create_trading_prompt(
         [
             "ACCOUNT INFORMATION AND PERFORMANCE",
             f"- Total Return (%): {fmt(state['total_return_pct'], 2)}",
-            f"- Available Cash: {fmt(state['balance'], 2)}",
+            f"- Available Cash: {fmt(state['total_balance'], 2)}",
             f"- Margin Allocated: {fmt(state['total_margin'], 2)}",
             f"- Unrealized PnL: {fmt(state['net_unrealized_pnl'], 2)}",
             f"- Current Account Value: {fmt(state['total_equity'], 2)}",

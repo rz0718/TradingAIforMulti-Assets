@@ -78,14 +78,20 @@ class TradingState:
             config.RISK_FREE_RATE
         )
 
+        # Format position details as JSON string for CSV storage
+        position_details = json.dumps(self.positions) if self.positions else ""
+
         return {
-            "balance": self.balance,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "total_balance": self.balance,
             "positions": self.positions,
             "start_time": self.start_time,
             "invocation_count": self.invocation_count,
             "total_equity": total_equity,
             "total_margin": total_margin,
             "total_return_pct": total_return_pct,
+            "num_positions": len(self.positions),
+            "position_details": position_details,
             "net_unrealized_pnl": net_unrealized_pnl,
             "sharpe_ratio": sharpe_ratio
         }
@@ -183,33 +189,66 @@ def calculate_sharpe_ratio(
         equity_values: Sequence of equity values in chronological order.
         period_seconds: Average period between snapshots (used to annualize).
         risk_free_rate: Annualized risk-free rate (decimal form).
+    
+    Returns:
+        Annualized Sharpe ratio, or None if insufficient data or calculation fails.
     """
     values = [float(v) for v in equity_values if isinstance(v, (int, float, np.floating)) and np.isfinite(v)]
-    if len(values) < 2:
+    
+    # Require minimum number of data points for meaningful Sharpe calculation
+    # With 3-minute intervals, 20 points = 1 hour, 30 points = 1.5 hours
+    MIN_DATA_POINTS = 20
+    if len(values) < MIN_DATA_POINTS:
         return None
-
-    returns = np.diff(values) / np.array(values[:-1], dtype=float)
-    returns = returns[np.isfinite(returns)]
-    if returns.size == 0:
+    
+    # Use log returns for better numerical stability with small changes
+    # log(1 + r) ≈ r for small r, but handles large changes better
+    log_values = np.log(np.array(values, dtype=float))
+    log_returns = np.diff(log_values)
+    
+    # Filter out invalid returns
+    log_returns = log_returns[np.isfinite(log_returns)]
+    if log_returns.size == 0:
         return None
-
+    
     period_seconds = float(period_seconds) if period_seconds and period_seconds > 0 else config.CHECK_INTERVAL
     periods_per_year = (365 * 24 * 60 * 60) / period_seconds
     if not np.isfinite(periods_per_year) or periods_per_year <= 0:
         return None
-
-    per_period_rf = risk_free_rate / periods_per_year
-    excess_return = returns.mean() - per_period_rf
+    
+    # Calculate per-period risk-free rate
+    # For log returns, we need log(1 + rf_period), but for small rates, ln(1+r) ≈ r
+    # Using the exact log form for precision
+    per_period_rf_simple = risk_free_rate / periods_per_year
+    per_period_rf_log = np.log(1.0 + per_period_rf_simple)
+    
+    # Mean excess return per period
+    mean_return = log_returns.mean()
+    excess_return = mean_return - per_period_rf_log
+    
     if not np.isfinite(excess_return):
         return None
-
-    return_std = np.std(returns)
-    if return_std <= 0 or not np.isfinite(return_std):
+    
+    # Standard deviation of returns
+    return_std = np.std(log_returns, ddof=1)  # Use sample std (ddof=1) for better estimate
+    
+    # Require minimum std threshold to avoid division by extremely small numbers
+    # This prevents unrealistic Sharpe ratios from tiny variations
+    MIN_STD_THRESHOLD = 1e-6  # 0.0001% minimum std
+    if return_std < MIN_STD_THRESHOLD:
         return None
-
+    
+    # Calculate annualized Sharpe ratio
+    # For log returns: Sharpe = (mean_return - rf) / std * sqrt(periods_per_year)
     sharpe = (excess_return / return_std) * np.sqrt(periods_per_year)
+    
     if not np.isfinite(sharpe):
         return None
+    
+    # Cap Sharpe ratio at reasonable values (±10) to avoid extreme outliers
+    # Real-world Sharpe ratios rarely exceed ±5
+    sharpe = np.clip(sharpe, -10.0, 10.0)
+    
     return float(sharpe)
 
 
@@ -367,8 +406,21 @@ def run_trading_loop(model_name: str):
                     current_price = market_snapshots.get(coin, {}).get('price')
                     if not current_price: continue
 
-                    if decision.get('signal') in ['entry', 'close']:
+                    signal = decision.get('signal')
+                    if signal == 'entry':
                         execute_trade(state, coin, decision, current_price)
+                    elif signal == 'close':
+                        execute_trade(state, coin, decision, current_price)
+                    elif signal == 'hold' and coin in state.positions:
+                        # Update position metadata with latest decision rationale
+                        # This keeps justification and other fields current
+                        pos = state.positions[coin]
+                        if 'justification' in decision:
+                            pos['justification'] = decision['justification']
+                        if 'invalidation_condition' in decision:
+                            pos['invalidation_condition'] = decision['invalidation_condition']
+                        if 'confidence' in decision:
+                            pos['confidence'] = decision.get('confidence', pos.get('confidence', 0.5))
             else:
                 logging.warning("No decisions received from LLM.")
 
