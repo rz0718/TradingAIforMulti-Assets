@@ -372,25 +372,27 @@ def create_trading_prompt(
             f"- Available Cash: {fmt(state['balance'], 2)}",
             f"- Unrealized PnL: {fmt(state['net_unrealized_pnl'], 2)}",
             f"- Current Account Value: {fmt(state['total_equity'], 2)}",
-            "Open positions and performance details:",
+            "Open positions and their performance details:",
         ]
     )
-
-    for coin, pos in state["positions"].items():
-        current_price = market_snapshots.get(coin, {}).get("price", pos["entry_price"])
-        pnl = (
+    if len(state["positions"]) == 0:
+        prompt_lines.append("No open positions yet.")
+    else:
+        for coin, pos in state["positions"].items():
+            current_price = market_snapshots.get(coin, {}).get("price", pos["entry_price"])
+            pnl = (
             (current_price - pos["entry_price"]) * pos["quantity"]
             if pos["side"] == "long"
             else (pos["entry_price"] - current_price) * pos["quantity"]
-        )
-        leverage = pos.get("leverage", 1) or 1
-        liquidation_price = (
-            pos["entry_price"] * max(0.0, 1 - 1 / leverage)
-            if pos["side"] == "long"
+            )
+            leverage = pos.get("leverage", 1) or 1
+            liquidation_price = (
+                pos["entry_price"] * max(0.0, 1 - 1 / leverage)
+                if pos["side"] == "long"
             else pos["entry_price"] * (1 + 1 / leverage)
-        )
+            )
 
-        position_payload = {
+            position_payload = {
             "symbol": coin,
             "side": pos["side"],
             "quantity": pos["quantity"],
@@ -407,8 +409,8 @@ def create_trading_prompt(
             "confidence": pos["confidence"],
             "risk_usd": pos["risk_usd"],
             "notional_usd": pos["quantity"] * current_price,
-        }
-        prompt_lines.append(f"{coin} position data: {json.dumps(position_payload)}")
+            }
+            prompt_lines.append(f"{coin} position data: {json.dumps(position_payload)}")
 
     prompt_lines.append(
         """
