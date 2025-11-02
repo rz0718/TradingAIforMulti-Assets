@@ -65,9 +65,14 @@ class TradingState:
         """Calculates a full summary of the current portfolio state."""
         total_margin = sum(float(p.get("margin", 0.0)) for p in self.positions.values())
         total_equity = self.balance + total_margin
+
+        # Update each position with current unrealized PnL
         for coin, pos in self.positions.items():
             price = market_snapshots.get(coin, {}).get("price", pos["entry_price"])
-            total_equity += self.calculate_unrealized_pnl(coin, price)
+            unrealized_pnl = self.calculate_unrealized_pnl(coin, price)
+            pos["unrealized_pnl"] = unrealized_pnl
+            pos["current_price"] = price
+            total_equity += unrealized_pnl
 
         total_return_pct = (
             (total_equity - config.START_CAPITAL) / config.START_CAPITAL
@@ -474,12 +479,14 @@ def execute_trade(
             "side": side,
             "quantity": quantity,
             "entry_price": price,
+            "current_price": price,
             "profit_target": profit_target,
             "stop_loss": stop_loss,
             "leverage": leverage,
             "confidence": decision.get("confidence", 0.5),
             "margin": margin_required,
             "risk_usd": risk_usd,
+            "unrealized_pnl": 0.0,  # Initialize at 0 on entry
             "invalidation_condition": decision.get("invalidation_condition", ""),
             "justification": decision.get("justification", ""),
         }

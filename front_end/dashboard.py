@@ -439,6 +439,14 @@ def render_positions_table(portfolio_state):
                             f"**Quantity:** {details['quantity']} @ {details['leverage']}x"
                         )
 
+                        # Show unrealized PnL if available
+                        unrealized_pnl = details.get("unrealized_pnl", 0)
+                        pnl_color = get_color_for_value(unrealized_pnl)
+                        st.markdown(
+                            f'<span class="{pnl_color}">**Unrealized PnL:** {format_currency(unrealized_pnl)}</span>',
+                            unsafe_allow_html=True,
+                        )
+
                     with col3:
                         st.markdown(
                             f"🎯 Target: {format_currency(details['profit_target'])}"
@@ -446,7 +454,6 @@ def render_positions_table(portfolio_state):
                         st.markdown(f"🛑 Stop: {format_currency(details['stop_loss'])}")
 
                     with col4:
-                        # Calculate unrealized PnL (simplified - would need current price)
                         margin = details["margin"]
                         st.markdown(f"**Margin:** {format_currency(margin)}")
                         confidence = details.get("confidence", 0)
