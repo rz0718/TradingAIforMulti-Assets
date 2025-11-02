@@ -1158,6 +1158,7 @@ dependencies = [
     { name = "openai" },
     { name = "python-binance" },
     { name = "python-dotenv" },
+    { name = "pytz" },
     { name = "requests" },
     { name = "streamlit" },
 ]
@@ -1171,6 +1172,7 @@ requires-dist = [
     { name = "openai", specifier = "==1.35.13" },
     { name = "python-binance", specifier = "==1.0.19" },
     { name = "python-dotenv", specifier = "==1.0.0" },
+    { name = "pytz", specifier = ">=2025.2" },
     { name = "requests", specifier = "==2.31.0" },
     { name = "streamlit", specifier = "==1.38.0" },
 ]

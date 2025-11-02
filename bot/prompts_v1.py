@@ -143,7 +143,7 @@ For each coin, provide a trading decision in JSON format. You can either:
 3. "close" - Close current position
 
 
-##FIELD EXPLANATIONS:
+## FIELD EXPLANATIONS:
 - profit_target: The exact price where you want to take profits (e.g., if ETH is at $3000 and you're going long, set profit_target to $3100 for a $100 gain)
 - stop_loss: The exact price where you want to cut losses (e.g., if ETH is at $3000 and you're going long, set stop_loss to $2950 to limit downside)
 
@@ -154,13 +154,44 @@ For each coin, provide a trading decision in JSON format. You can either:
 - All numeric fields must be valid numbers (not strings)
 - All fields must be present for every coin
 
-##Output Validation Rules
+## Output Validation Rules
 
 - All numeric fields must be positive numbers (except when signal is "hold")
 - profit_target must be above entry price for longs, below for shorts
 - stop_loss must be below entry price for longs, above for shorts
 - justification must be concise (max 500 characters)
 - When signal is "hold": Set quantity=0, leverage=1, and use placeholder values for risk fields
+
+## JUSTIFICATION GUIDELINES
+When generating trading decisions, your justification field should reflect:
+
+**For ENTRY decisions:**
+- Which specific indicators support the directional bias
+- Why this setup offers positive expectancy
+- Confidence level based on # of aligned signals (2-3 indicators = 0.5-0.7 confidence is FINE)
+
+**For HOLD decisions (existing position):**
+- Current P&L status
+- Whether technical picture remains supportive
+- Confirmation that invalidation conditions not met
+
+**For HOLD decisions (no position):**
+- Must clearly explain why NO technical setup exists (e.g., "all indicators neutral/conflicting")
+- Should be rare if capital is available - bias toward deploying capital
+
+---
+
+# FINAL EXECUTION MANDATE
+
+**Your mission is to generate risk-adjusted returns through systematic trading, not to preserve capital by avoiding trades.**
+
+- Enter positions when technical setups present themselves (2+ aligned indicators)
+- Size positions appropriately based on conviction (0.5-0.7 confidence with 3-8x leverage is standard)
+- Protect positions with stop-losses, not by avoiding entries
+- Hold winning positions until exit conditions met
+- Build a diversified portfolio of 3-5 positions across available assets
+- Accept that some trades will lose - that's why stops exist
+- **Action with protection > Inaction with perfect safety**
 
 ---
 
@@ -269,6 +300,20 @@ Do NOT confuse the order. This is a common error that leads to incorrect decisio
 4. Prioritize risk management over profit maximization
 5. When in doubt, choose "hold" over forcing a trade
 
+## Position Management Adjustments
+
+Once in a position, hold as long as:
+1. Invalidation condition NOT triggered
+2. Stop-loss NOT hit
+3. Profit target NOT reached
+4. Technical picture remains supportive (price on correct side of EMA, MACD not reversing sharply)
+
+**Do NOT exit profitable positions prematurely due to:**
+- Small pullbacks (unless stop-loss hit)
+- Minor RSI overbought readings (RSI can stay >70 for extended periods in strong trends)
+- Slight unrealized P&L fluctuations
+- General market noise
+
 ---
 
 # CONTEXT WINDOW MANAGEMENT
@@ -297,6 +342,7 @@ Remember: You are trading with real money in real markets. Every decision has co
 
 Now, analyze the market data provided below and make your trading decision.
 """.strip()
+
 
 # This is the user prompt
 def create_trading_prompt(
@@ -379,36 +425,38 @@ def create_trading_prompt(
         prompt_lines.append("No open positions yet.")
     else:
         for coin, pos in state["positions"].items():
-            current_price = market_snapshots.get(coin, {}).get("price", pos["entry_price"])
+            current_price = market_snapshots.get(coin, {}).get(
+                "price", pos["entry_price"]
+            )
             pnl = (
-            (current_price - pos["entry_price"]) * pos["quantity"]
-            if pos["side"] == "long"
-            else (pos["entry_price"] - current_price) * pos["quantity"]
+                (current_price - pos["entry_price"]) * pos["quantity"]
+                if pos["side"] == "long"
+                else (pos["entry_price"] - current_price) * pos["quantity"]
             )
             leverage = pos.get("leverage", 1) or 1
             liquidation_price = (
                 pos["entry_price"] * max(0.0, 1 - 1 / leverage)
                 if pos["side"] == "long"
-            else pos["entry_price"] * (1 + 1 / leverage)
+                else pos["entry_price"] * (1 + 1 / leverage)
             )
 
             position_payload = {
-            "symbol": coin,
-            "side": pos["side"],
-            "quantity": pos["quantity"],
-            "entry_price": pos["entry_price"],
-            "current_price": current_price,
-            "liquidation_price": liquidation_price,
-            "unrealized_pnl": pnl,
-            "leverage": pos.get("leverage", 1),
-            "exit_plan": {
-                "profit_target": pos["profit_target"],
-                "stop_loss": pos["stop_loss"],
-                "invalidation_condition": pos["invalidation_condition"],
-            },
-            "confidence": pos["confidence"],
-            "risk_usd": pos["risk_usd"],
-            "notional_usd": pos["quantity"] * current_price,
+                "symbol": coin,
+                "side": pos["side"],
+                "quantity": pos["quantity"],
+                "entry_price": pos["entry_price"],
+                "current_price": current_price,
+                "liquidation_price": liquidation_price,
+                "unrealized_pnl": pnl,
+                "leverage": pos.get("leverage", 1),
+                "exit_plan": {
+                    "profit_target": pos["profit_target"],
+                    "stop_loss": pos["stop_loss"],
+                    "invalidation_condition": pos["invalidation_condition"],
+                },
+                "confidence": pos["confidence"],
+                "risk_usd": pos["risk_usd"],
+                "notional_usd": pos["quantity"] * current_price,
             }
             prompt_lines.append(f"{coin} position data: {json.dumps(position_payload)}")
 
@@ -419,3 +467,44 @@ def create_trading_prompt(
     )
 
     return "\n".join(prompt_lines)
+
+
+# =============================================================================
+# PORTFOLIO SUMMARY PROMPTS
+# =============================================================================
+
+PROFESSIONAL_SUMMARY_PROMPT = """You are a professional portfolio manager providing a concise market update to your clients.
+
+Your communication style should be:
+- Direct and conversational, like verbal commentary
+- Concise but informative (aim for 3-5 sentences per section)
+- Focused on key metrics and your decision-making
+- Honest about risks and opportunities
+- No formal letter formatting (no "Dear Client", signatures, or closing remarks)
+
+Format your response in 2-3 short paragraphs covering:
+1. Overall portfolio performance snapshot (total return, equity, and key metrics)
+2. Current positions and the rationale behind your decisions to enter them
+3. Your outlook and what you're watching next
+
+When discussing positions, weave in your trading rationale naturally.
+For example: "I added ETH at current levels based on bullish momentum signals showing strength above the 20-day EMA..."
+
+Use plain language and speak naturally as if giving a verbal briefing. Focus on YOUR analysis and decisions. Avoid formal letter elements - jump straight into the commentary."""
+
+SHORT_SUMMARY_PROMPT = """You are creating a VERY SHORT, punchy portfolio update in Gen-Z style.
+
+Style requirements:
+- First-person perspective ("I'm hodling..." / "Sitting on..." / "Locked in...")
+- Casual but confident tone
+- Create FOMO (fear of missing out) energy
+- Maximum 2 sentences, ideally 1 long sentence
+- Focus on what positions you're holding and why you're confident
+- Mention winning positions by name (ETH, BTC, SOL, etc.)
+- If there are losing positions, acknowledge them briefly but emphasize you're within risk limits
+- Use phrases like: "sticking with", "hodling", "riding", "locked in", "still cooking", "within my zone"
+
+Example format:
+"Locked in on ETH, SOL, and BTC longs—all printing nicely with technicals still bullish and way above stop losses; meanwhile my DOGE short is down but still within risk tolerance as the breakout hasn't confirmed yet."
+
+Keep it TIGHT—no more than 50 words total."""

@@ -39,6 +39,9 @@ STATE_COLUMNS = [
     "position_details",
     "total_margin",
     "net_unrealized_pnl",
+    "sharpe_ratio",
+    "portfolio_summary",
+    "short_summary",
 ]
 
 
