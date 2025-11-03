@@ -111,7 +111,7 @@ def collect_market_data(symbol: str) -> Optional[Dict[str, Any]]:
             df_long,
             ema_lengths=(20, 50),
             rsi_periods=(14,),
-            macd_params=(config.MACD_FAST, config.MACD_SLOW, config.MACD_SIGNALSIGNAL),
+            macd_params=(config.MACD_FAST, config.MACD_SLOW, config.MACD_SIGNAL),
         )
 
         df_long["atr3"] = calculate_atr_series(df_long, 3)

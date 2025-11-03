@@ -12,11 +12,16 @@ import numpy as np
 import pandas as pd
 from colorama import Fore, Style
 
-from . import clients, config, data_processing, utils
-from . import prompts_v1 as prompts
+from . import clients, config, utils
 
 from openai import OpenAI
 
+if config.ASSET_MODE.lower() == "crypto":
+    from . import data_processing_crypto as data_processing
+    from . import prompts_v1 as prompts
+elif config.ASSET_MODE.lower() == "us_stock":
+    from . import data_processing_stock as data_processing
+    from . import prompts_stock as prompts
 
 class TradingState:
     """Manages the full state of the trading bot."""
