@@ -28,6 +28,7 @@ class TradingState:
         self.start_time: datetime = datetime.now(timezone.utc)
         self.invocation_count: int = 0
         self.current_iteration_messages: list[str] = []
+        self.current_iteration_trades: list[Dict[str, Any]] = []
 
     def load_state(self):
         """Load persisted balance and positions if available."""
@@ -494,23 +495,25 @@ def execute_trade(
         # Update balance
         state.balance -= margin_required
         logging.info(f"ENTRY: {coin} {side.upper()} {quantity:.4f} @ ${price:.4f}")
-        utils.log_trade(
-            {
-                "timestamp": datetime.now().isoformat(),
-                "coin": coin,
-                "action": "ENTRY",
-                "side": side,
-                "quantity": quantity,
-                "price": price,
-                "profit_target": profit_target,
-                "stop_loss": stop_loss,
-                "leverage": leverage,
-                "confidence": decision.get("confidence", 0.5),
-                "pnl": 0.0,  # No PnL on entry
-                "balance_after": state.balance,
-                "reason": decision.get("justification", "AI entry signal"),
-            }
-        )
+        
+        trade_data = {
+            "timestamp": datetime.now().isoformat(),
+            "coin": coin,
+            "action": "ENTRY",
+            "side": side,
+            "quantity": quantity,
+            "price": price,
+            "profit_target": profit_target,
+            "stop_loss": stop_loss,
+            "leverage": leverage,
+            "confidence": decision.get("confidence", 0.5),
+            "pnl": 0.0,  # No PnL on entry
+            "balance_after": state.balance,
+            "reason": decision.get("justification", "AI entry signal"),
+        }
+        
+        utils.log_trade(trade_data)
+        state.current_iteration_trades.append(trade_data)
 
     elif signal == "close":
         if coin not in state.positions:
@@ -527,23 +530,25 @@ def execute_trade(
             f"CLOSE: {coin} {pos['side'].upper()} @ ${price:.4f} | PnL: ${pnl:.2f}"
         )
 
-        utils.log_trade(
-            {
-                "timestamp": datetime.now().isoformat(),
-                "coin": coin,
-                "action": "CLOSE",
-                "side": pos["side"],
-                "quantity": pos["quantity"],
-                "price": price,
-                "profit_target": pos["profit_target"],
-                "stop_loss": pos["stop_loss"],
-                "leverage": pos["leverage"],
-                "confidence": pos["confidence"],
-                "pnl": pnl,
-                "balance_after": state.balance,
-                "reason": decision.get("justification", "AI close signal"),
-            }
-        )
+        trade_data = {
+            "timestamp": datetime.now().isoformat(),
+            "coin": coin,
+            "action": "CLOSE",
+            "side": pos["side"],
+            "quantity": pos["quantity"],
+            "price": price,
+            "profit_target": pos["profit_target"],
+            "stop_loss": pos["stop_loss"],
+            "leverage": pos["leverage"],
+            "confidence": pos["confidence"],
+            "pnl": pnl,
+            "balance_after": state.balance,
+            "reason": decision.get("justification", "AI close signal"),
+        }
+        
+        utils.log_trade(trade_data)
+        state.current_iteration_trades.append(trade_data)
+        
         # Remove position
         del state.positions[coin]
 
@@ -568,6 +573,7 @@ def run_trading_loop(model_name: str):
         try:
             state.invocation_count += 1
             state.current_iteration_messages = []
+            state.current_iteration_trades = []  # Reset trades for this iteration
 
             header = f"\n{Fore.CYAN}{'='*20} Iteration {state.invocation_count} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {'='*20}{Style.RESET_ALL}"
             print(header)
@@ -664,7 +670,24 @@ def run_trading_loop(model_name: str):
 
             utils.log_portfolio_state(summary)
 
-            # 5. Wait for next interval
+            # 5. Send Telegram notification
+            if config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID:
+                try:
+                    telegram_message = utils.format_trading_signal_message(
+                        new_trades=state.current_iteration_trades,
+                        positions=state.positions,
+                        market_snapshots=market_snapshots,
+                        short_summary=summary.get("short_summary", ""),
+                        total_equity=summary["total_equity"],
+                        total_return_pct=summary["total_return_pct"],
+                        net_unrealized_pnl=summary["net_unrealized_pnl"],
+                    )
+                    utils.send_telegram_message(telegram_message, parse_mode="HTML")
+                    logging.info("Telegram notification sent successfully")
+                except Exception as e:
+                    logging.error(f"Failed to send Telegram notification: {e}", exc_info=True)
+
+            # 6. Wait for next interval
             logging.info(f"Waiting {config.CHECK_INTERVAL} seconds...")
             time.sleep(config.CHECK_INTERVAL)
 
