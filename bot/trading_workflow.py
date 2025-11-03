@@ -7,6 +7,7 @@ import logging
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Iterable
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -580,6 +581,26 @@ def execute_trade(
         del state.positions[coin]
 
 
+def is_market_open() -> bool:
+    """
+    Check if US stock market is currently open.
+    Market hours: 9:30 AM - 4:00 PM ET, Monday-Friday
+    """    
+    # For US stocks, check market hours
+    et_tz = ZoneInfo("America/New_York")
+    now = datetime.now(et_tz)
+    
+    # Check if weekend
+    if now.weekday() >= 5:  # Saturday = 5, Sunday = 6
+        return False
+    
+    # Check if within market hours (9:30 AM - 4:00 PM ET)
+    market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    
+    return market_open <= now <= market_close
+
+
 def run_trading_loop(model_name: str):
     """The main event loop for the trading bot."""
     utils.setup_logging()
@@ -598,6 +619,16 @@ def run_trading_loop(model_name: str):
 
     while True:
         try:
+            # Check if market is still open (for US stocks)
+            if config.ASSET_MODE.lower() == "us_stock":
+                if not is_market_open():
+                    et_tz = ZoneInfo("America/New_York")
+                    current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+                    logging.info(f"Market is now closed (current time: {current_time}). Saving state and exiting...")
+                    state.save_state()
+                    logging.info("Bot will need to be restarted when market opens.")
+                    break
+            
             state.invocation_count += 1
             state.current_iteration_messages = []
             state.current_iteration_trades = []  # Reset trades for this iteration
