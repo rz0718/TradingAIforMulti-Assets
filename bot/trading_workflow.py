@@ -172,7 +172,7 @@ def get_llm_decisions(
                 "metadata": {"id": response.id},
             }
         )
-
+        
         if not content:
             logging.error("LLM API returned empty content.")
             return None
