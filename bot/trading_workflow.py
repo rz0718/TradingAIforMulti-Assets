@@ -376,8 +376,8 @@ def calculate_sharpe_ratio(
     ]
 
     # Require minimum number of data points for meaningful Sharpe calculation
-    # With 3-minute intervals, 20 points = 1 hour, 30 points = 1.5 hours
-    MIN_DATA_POINTS = 20
+    # With 5-minute intervals, 12 points = 1 hour, 18 points = 1.5 hours
+    MIN_DATA_POINTS = 12
     if len(values) < MIN_DATA_POINTS:
         return None
 

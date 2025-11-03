@@ -191,7 +191,7 @@ Edit `bot/utils.py` → `format_trading_signal_message()` function to:
 
 Currently sends at each trading iteration. To change:
 - Modify in `bot/config.py` → `CHECK_INTERVAL` (in seconds)
-- Default: 180 seconds (3 minutes)
+- Default: 300 seconds (5 minutes)
 
 ### Conditional Notifications
 
@@ -228,7 +228,7 @@ Telegram has a 4096 character limit. If exceeded:
 
 ### Rate Limiting
 
-Telegram limits bots to ~30 messages/second. This shouldn't be an issue with normal trading frequency (every 3 minutes).
+Telegram limits bots to ~30 messages/second. This shouldn't be an issue with normal trading frequency (every 5 minutes).
 
 ## Privacy & Security
 
