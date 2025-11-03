@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+
+ASSET_MODE = os.getenv("ASSET_MODE", "crypto")
+
 # --- DATA DIRECTORY ---
 DATA_DIR = Path(os.getenv("TRADEBOT_DATA_DIR", "data"))
 DATA_DIR.mkdir(exist_ok=True)
@@ -20,6 +23,10 @@ BN_SECRET = os.getenv("BN_SECRET", "")
 # --- OPENROUTER MULTI-LLM CONFIGURATION ---
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+# --- ALPACA API CONFIGURATION ---
+ALPACA_API_KEY = os.getenv("ALPACA_API_KEY", "")
+ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
 
 # Two LLM Models for Focused Testing (Claude Sonnet and Gemini Pro)
 LLM_MODELS = {
@@ -42,16 +49,27 @@ LLM_MODELS = {
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-# --- TRADING PARAMETERS ---
-SYMBOLS = ["ETHUSDT", "SOLUSDT", "XRPUSDT", "BTCUSDT", "DOGEUSDT", "BNBUSDT"]
-SYMBOL_TO_COIN = {
-    "ETHUSDT": "ETH",
-    "SOLUSDT": "SOL",
-    "XRPUSDT": "XRP",
-    "BTCUSDT": "BTC",
-    "DOGEUSDT": "DOGE",
-    "BNBUSDT": "BNB",
-}
+if ASSET_MODE.lower() == "crypto":
+    # --- TRADING PARAMETERS ---
+    SYMBOLS = ["ETHUSDT", "SOLUSDT", "XRPUSDT", "BTCUSDT", "DOGEUSDT", "BNBUSDT"]
+    SYMBOL_TO_COIN = {
+        "ETHUSDT": "ETH",
+        "SOLUSDT": "SOL",
+        "XRPUSDT": "XRP",
+        "BTCUSDT": "BTC",
+        "DOGEUSDT": "DOGE",
+        "BNBUSDT": "BNB",
+    }
+elif ASSET_MODE.lower() == "us_stock":
+    SYMBOLS = ["AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "NVDA"]
+    SYMBOL_TO_COIN = {
+        "AAPL": "AAPL",
+        "MSFT": "MSFT",
+        "GOOG": "GOOG",
+        "AMZN": "AMZN",
+        "TSLA": "TSLA",
+        "NVDA": "NVDA",
+    }
 INTERVAL = "3m"  # 3-minute candles
 CHECK_INTERVAL = 3 * 60  # Check every 3 minutes (when candle closes)
 START_CAPITAL = 10000.0
