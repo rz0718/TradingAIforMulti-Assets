@@ -175,8 +175,8 @@ def get_llm_decisions(
                 {"role": "system", "content": prompts.TRADING_RULES_PROMPT},
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.7,
-            max_tokens=4000,
+            temperature=model_config["temperature"],
+            max_tokens=model_config["max_tokens"],
             response_format={"type": "json_object"},
         )
         content = response.choices[0].message.content
@@ -347,8 +347,8 @@ Generate ONE punchy sentence summarizing your portfolio stance."""
                 {"role": "system", "content": prompts.PROFESSIONAL_SUMMARY_PROMPT},
                 {"role": "user", "content": professional_user_prompt},
             ],
-            temperature=0.7,
-            max_tokens=500,
+            temperature=config.PROFESSIONAL_SUMMARY_TEMPERATURE,
+            max_tokens=config.PROFESSIONAL_SUMMARY_MAX_TOKENS,
         )
         professional_summary = response1.choices[0].message.content
         professional_summary = (
@@ -362,8 +362,8 @@ Generate ONE punchy sentence summarizing your portfolio stance."""
                 {"role": "system", "content": prompts.SHORT_SUMMARY_PROMPT},
                 {"role": "user", "content": short_user_prompt},
             ],
-            temperature=0.8,  # Slightly higher for more creative/casual tone
-            max_tokens=100,
+            temperature=config.SHORT_SUMMARY_TEMPERATURE,
+            max_tokens=config.SHORT_SUMMARY_MAX_TOKENS,
         )
         short_summary = response2.choices[0].message.content
         short_summary = short_summary.strip() if short_summary else None
