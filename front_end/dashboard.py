@@ -338,27 +338,15 @@ def render_header(portfolio_state, last_update):
     if portfolio_state is not None and not portfolio_state.empty:
         latest = portfolio_state.iloc[-1]
 
-        # Calculate changes
-        if len(portfolio_state) > 1:
-            previous = portfolio_state.iloc[-2]
-            equity_change_pct = (
-                (latest["total_equity"] - previous["total_equity"])
-                / previous["total_equity"]
-            ) * 100
-        else:
-            equity_change_pct = 0.0
-
-        # Key metrics row
-        col1, col2, col3, col4 = st.columns(4)
+        # Key metrics row - now with 5 columns
+        col1, col2, col3, col4, col5 = st.columns(5)
 
         with col1:
-            change_color = get_color_for_value(equity_change_pct)
             st.markdown(
                 f"""
             <div class="metric-card">
                 <div class="metric-label">Total Account Value</div>
                 <div class="metric-value">{format_currency(latest['total_equity'])}</div>
-                <div class="metric-change {change_color}">{format_percent(equity_change_pct)}</div>
             </div>
             """,
                 unsafe_allow_html=True,
@@ -389,6 +377,20 @@ def render_header(portfolio_state, last_update):
             )
 
         with col4:
+            # Total Return % as a separate metric
+            total_return_pct = latest.get("total_return_pct", 0.0)
+            return_color = get_color_for_value(total_return_pct)
+            st.markdown(
+                f"""
+            <div class="metric-card">
+                <div class="metric-label">Total Return</div>
+                <div class="metric-value {return_color}">{format_percent(total_return_pct)}</div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+        with col5:
             st.markdown(
                 f"""
             <div class="metric-card">

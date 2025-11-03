@@ -39,10 +39,32 @@ class TradingState:
             with open(utils.STATE_JSON, "r") as f:
                 data = json.load(f)
             self.balance = float(data.get("balance", config.START_CAPITAL))
-            # ... (More robust state loading can be added here)
-            logging.info(
-                "Loaded state from %s (balance: %.2f)", utils.STATE_JSON, self.balance
-            )
+            
+            # Load positions if they exist
+            if "positions" in data and isinstance(data["positions"], dict):
+                self.positions = data["positions"]
+                logging.info(
+                    "Loaded state from %s (balance: %.2f, positions: %d)",
+                    utils.STATE_JSON,
+                    self.balance,
+                    len(self.positions)
+                )
+                # Log each position for visibility
+                for coin, pos in self.positions.items():
+                    logging.info(
+                        "  Restored position: %s %s @ $%.4f (qty: %.4f, leverage: %dx)",
+                        coin,
+                        pos.get("side", "").upper(),
+                        pos.get("entry_price", 0),
+                        pos.get("quantity", 0),
+                        pos.get("leverage", 1)
+                    )
+            else:
+                logging.info(
+                    "Loaded state from %s (balance: %.2f, no positions)", 
+                    utils.STATE_JSON, 
+                    self.balance
+                )
         except Exception as e:
             logging.error("Failed to load state: %s", e, exc_info=True)
 
