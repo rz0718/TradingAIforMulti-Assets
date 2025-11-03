@@ -129,7 +129,7 @@ def get_llm_decisions(
     try:
         utils.log_ai_message(
             {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "direction": "sent",
                 "role": "system",
                 "content": prompts.TRADING_RULES_PROMPT,
@@ -138,7 +138,7 @@ def get_llm_decisions(
         )
         utils.log_ai_message(
             {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "direction": "sent",
                 "role": "user",
                 "content": prompt,
@@ -160,7 +160,7 @@ def get_llm_decisions(
         content = response.choices[0].message.content
         utils.log_ai_message(
             {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "direction": "received",
                 "role": "assistant",
                 "content": content,
@@ -497,7 +497,7 @@ def execute_trade(
         logging.info(f"ENTRY: {coin} {side.upper()} {quantity:.4f} @ ${price:.4f}")
         
         trade_data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "coin": coin,
             "action": "ENTRY",
             "side": side,
@@ -531,7 +531,7 @@ def execute_trade(
         )
 
         trade_data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "coin": coin,
             "action": "CLOSE",
             "side": pos["side"],
@@ -575,7 +575,7 @@ def run_trading_loop(model_name: str):
             state.current_iteration_messages = []
             state.current_iteration_trades = []  # Reset trades for this iteration
 
-            header = f"\n{Fore.CYAN}{'='*20} Iteration {state.invocation_count} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {'='*20}{Style.RESET_ALL}"
+            header = f"\n{Fore.CYAN}{'='*20} Iteration {state.invocation_count} - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} {'='*20}{Style.RESET_ALL}"
             print(header)
             state.current_iteration_messages.append(utils.strip_ansi_codes(header))
 
@@ -605,7 +605,7 @@ def run_trading_loop(model_name: str):
 
                     utils.log_ai_decision(
                         {
-                            "timestamp": datetime.now().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                             "coin": coin,
                             **decision,
                         }

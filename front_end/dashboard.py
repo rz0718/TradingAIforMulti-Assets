@@ -213,19 +213,19 @@ DATA_DIR = PROJECT_ROOT / "data"
 def load_data():
     """Load all CSV data files"""
     try:
-        # Note: CSV timestamps are in UTC+8, we need to convert to UTC+7 (WIB)
-        utc_plus_8 = pytz.timezone("Asia/Singapore")  # UTC+8
+        # Note: CSV timestamps are in UTC, we need to convert to UTC+7 (WIB)
+        utc = pytz.UTC
 
         def process_timestamp(df):
             """Process timestamp column, handling both tz-aware and naive timestamps"""
             df["timestamp"] = pd.to_datetime(df["timestamp"])
             # Check if already timezone-aware
             if df["timestamp"].dt.tz is None:
-                # Naive timestamps - localize to UTC+8
-                df["timestamp"] = df["timestamp"].dt.tz_localize(utc_plus_8)
+                # Naive timestamps - localize to UTC
+                df["timestamp"] = df["timestamp"].dt.tz_localize(utc)
             else:
-                # Already timezone-aware - convert to UTC+8
-                df["timestamp"] = df["timestamp"].dt.tz_convert(utc_plus_8)
+                # Already timezone-aware - convert to UTC
+                df["timestamp"] = df["timestamp"].dt.tz_convert(utc)
             return df
 
         ai_decisions = pd.read_csv(DATA_DIR / "ai_decisions.csv")
@@ -289,19 +289,19 @@ def get_confidence_color(confidence):
 
 def to_jakarta_time(timestamp):
     """Convert timestamp to Jakarta timezone (WIB/UTC+7)
-    Note: CSV timestamps are in UTC+8, so this converts UTC+8 to UTC+7"""
+    Note: CSV timestamps are in UTC, so this converts UTC to UTC+7"""
     jkt_tz = pytz.timezone("Asia/Jakarta")  # UTC+7 (WIB)
 
     # If timestamp is timezone-aware, convert it directly
     if timestamp.tzinfo is not None:
         return timestamp.astimezone(jkt_tz)
 
-    # If timestamp is naive, assume it's UTC+8 (as per CSV source)
-    utc_plus_8 = pytz.timezone("Asia/Singapore")  # UTC+8
-    timestamp_utc8 = utc_plus_8.localize(timestamp)
+    # If timestamp is naive, assume it's UTC (as per CSV source)
+    utc = pytz.UTC
+    timestamp_utc = utc.localize(timestamp)
 
     # Convert to Jakarta time (UTC+7)
-    return timestamp_utc8.astimezone(jkt_tz)
+    return timestamp_utc.astimezone(jkt_tz)
 
 
 def time_ago(timestamp):
