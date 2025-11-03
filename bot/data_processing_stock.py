@@ -99,11 +99,11 @@ def collect_market_data(symbol: str) -> Optional[Dict[str, Any]]:
         )
 
         
-        timeframe_4_hour = TimeFrame(4, TimeFrameUnit.Hour)
+        timeframe_1_hour = TimeFrame(1, TimeFrameUnit.Hour)
         df_long = get_latest_realtime_candles(
             symbol=symbol, 
             client=data_client, 
-            timeframe=timeframe_4_hour, 
+            timeframe=timeframe_1_hour, 
             limit=200
         )
         df_long[numeric_cols] = df_long[numeric_cols].astype(float)

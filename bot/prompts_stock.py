@@ -322,12 +322,12 @@ Once in a position, hold as long as:
 
 You have limited context. The prompt contains:
 - ~10 recent data points per indicator (3-minute intervals)
-- ~10 recent data points for 4-hour timeframe
+- ~10 recent data points for 1-hour timeframe
 - Current account state and open positions
 
 Optimize your analysis:
 - Focus on most recent 3-5 data points for short-term signals
-- Use 4-hour data for trend context and support/resistance levels
+- Use 1-hour data for trend context and support/resistance levels
 - Don't try to memorize all numbers, identify patterns instead
 
 ---
@@ -394,7 +394,7 @@ def create_trading_prompt(
                 f"    rsi7: {json.dumps(intraday['rsi7'])}",
                 f"    rsi14: {json.dumps(intraday['rsi14'])}",
                 f"    vwap: {json.dumps(intraday['vwap'])}",
-                "  Longer-term context (4-hour timeframe):",
+                "  Longer-term context (1-hour timeframe):",
                 f"    EMA20 vs EMA50: {fmt(long_term['ema20'], 3)} / {fmt(long_term['ema50'], 3)}",
                 f"    ATR3 vs ATR14: {fmt(long_term['atr3'], 3)} / {fmt(long_term['atr14'], 3)}",
                 f"    Volume (current/average): {fmt(long_term['current_volume'], 3)} / {fmt(long_term['average_volume'], 3)}",
