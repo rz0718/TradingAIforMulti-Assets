@@ -12,7 +12,7 @@ from . import config
 
 
 # This is the system prompt
-TRADING_RULES_PROMPT = """
+TRADING_RULES_PROMPT = f"""
 # ROLE & IDENTITY
 
 You are an autonomous cryptocurrency trading agent operating in live markets on the Hyperliquid decentralized exchange.
@@ -30,7 +30,7 @@ Your mission: Maximize risk-adjusted returns (PnL) through systematic, disciplin
 - **Asset Universe**: BTC, ETH, SOL, BNB, DOGE, XRP (perpetual contracts)
 - **Starting Capital**: $10,000 USD
 - **Market Hours**: 24/7 continuous trading
-- **Decision Frequency**: Every 3-5 minutes (mid-to-low frequency trading)
+- **Decision Frequency**: Every {int(config.CHECK_INTERVAL / 60)} minutes (mid-to-low frequency trading)
 - **Leverage Range**: 1x to 20x (use judiciously based on conviction)
 
 ## Trading Mechanics
@@ -121,8 +121,8 @@ For EVERY trade decision, you MUST specify:
 # OUTPUT FORMAT SPECIFICATION
 
 Return ONLY a valid JSON object with this structure:
-{
-  "ETH": {
+{{
+  "ETH": {{
     "signal": "hold|entry|close",
     "side": "long|short",  // REQUIRED for "entry", set to empty string "" for "hold" and "close"
     "quantity": 0.0,  // Position size in base currency (e.g., ETH). 
@@ -131,10 +131,10 @@ Return ONLY a valid JSON object with this structure:
     "leverage": 10,  // Leverage multiplier (1-125).
     "confidence": 0.75,  // Your confidence in this trade (0.0-1.0). 
     "risk_usd": 0.0,  // Dollar amount at risk (distance from entry to stop loss).
-    "invalidation_condition": "If price closes below X on a 5-minute candle",
+    "invalidation_condition": "If price closes below X on a {int(config.CHECK_INTERVAL / 60)}-minute candle",
     "justification": "Reason for entry/close/hold"  
-  }
-}
+  }}
+}}
 
 ## INSTRUCTIONS:
 For each coin, provide a trading decision in JSON format. You can either:
@@ -319,7 +319,7 @@ Once in a position, hold as long as:
 # CONTEXT WINDOW MANAGEMENT
 
 You have limited context. The prompt contains:
-- ~10 recent data points per indicator (5-minute intervals)
+- ~10 recent data points per indicator ({int(config.CHECK_INTERVAL / 60)}-minute intervals)
 - ~10 recent data points for 4-hour timeframe
 - Current account state and open positions
 
@@ -342,7 +342,6 @@ Remember: You are trading with real money in real markets. Every decision has co
 
 Now, analyze the market data provided below and make your trading decision.
 """.strip()
-
 
 # This is the user prompt
 def create_trading_prompt(
@@ -367,7 +366,7 @@ def create_trading_prompt(
         f"The current time is {now.isoformat()} and you've been invoked {state['invocation_count']} times. ",
         "Below is a variety of state data, price data, and predictive signals so you can discover alpha.",
         "ALL PRICE OR SIGNAL SERIES BELOW ARE ORDERED OLDEST → NEWEST.",
-        "Timeframe note: Intraday series use 5-minute intervals unless a different interval is explicitly mentioned.",
+        f"Timeframe note: Intraday series use {int(config.CHECK_INTERVAL / 60)}-minute intervals unless a different interval is explicitly mentioned.",
         "-" * 80,
         "CURRENT MARKET STATE FOR ALL COINS",
     ]
@@ -392,7 +391,7 @@ def create_trading_prompt(
                 f"- Price: {fmt(data['price'], 3)}, EMA20: {fmt(data['ema20'], 3)}, MACD: {fmt(data['macd'], 3)}, RSI(7): {fmt(data['rsi7'], 3)}",
                 f"- Open Interest (latest/avg): {fmt(open_interest.get('latest'), 2)} / {fmt(open_interest.get('average'), 2)}",
                 f"- Funding Rate (latest/avg): {fmt_rate(data['funding_rate'])} / {funding_avg_str}",
-                "  Intraday series (5-minute, oldest → latest):",
+                f"  Intraday series ({int(config.CHECK_INTERVAL / 60)}-minute, oldest → latest):",
                 f"    mid_prices: {json.dumps(intraday['mid_prices'])}",
                 f"    ema20: {json.dumps(intraday['ema20'])}",
                 f"    macd: {json.dumps(intraday['macd'])}",

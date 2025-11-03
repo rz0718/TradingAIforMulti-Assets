@@ -399,7 +399,7 @@ def calculate_sharpe_ratio(
 
     # Require minimum number of data points for meaningful Sharpe calculation
     # With 5-minute intervals, 12 points = 1 hour, 18 points = 1.5 hours
-    MIN_DATA_POINTS = 12
+    MIN_DATA_POINTS = int(60 / (config.CHECK_INTERVAL / 60))
     if len(values) < MIN_DATA_POINTS:
         return None
 
