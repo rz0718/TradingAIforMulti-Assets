@@ -80,7 +80,7 @@ def create_trading_prompt(
         f"The current time is {now.isoformat()} and you've been invoked {state['invocation_count']} times. ",
         "Below is a variety of state data, price data, and predictive signals so you can discover alpha.",
         "ALL PRICE OR SIGNAL SERIES BELOW ARE ORDERED OLDEST → NEWEST.",
-        "Timeframe note: Intraday series use 3-minute intervals unless a different interval is explicitly mentioned.",
+        "Timeframe note: Intraday series use 5-minute intervals unless a different interval is explicitly mentioned.",
         "-" * 80,
         "CURRENT MARKET STATE FOR ALL COINS",
     ]
@@ -105,7 +105,7 @@ def create_trading_prompt(
                 f"- Price: {fmt(data['price'], 3)}, EMA20: {fmt(data['ema20'], 3)}, MACD: {fmt(data['macd'], 3)}, RSI(7): {fmt(data['rsi7'], 3)}",
                 f"- Open Interest (latest/avg): {fmt(open_interest.get('latest'), 2)} / {fmt(open_interest.get('average'), 2)}",
                 f"- Funding Rate (latest/avg): {fmt_rate(data['funding_rate'])} / {funding_avg_str}",
-                "  Intraday series (3-minute, oldest → latest):",
+                "  Intraday series (5-minute, oldest → latest):",
                 f"    mid_prices: {json.dumps(intraday['mid_prices'])}",
                 f"    ema20: {json.dumps(intraday['ema20'])}",
                 f"    macd: {json.dumps(intraday['macd'])}",
@@ -178,7 +178,7 @@ Return ONLY a valid JSON object with this structure:
     "stop_loss": 0.0,  // Price level to cut losses.
     "leverage": 10,  // Leverage multiplier (1-125).
     "confidence": 0.75,  // Your confidence in this trade (0.0-1.0). 
-    "invalidation_condition": "If price closes below X on a 3-minute candle",
+    "invalidation_condition": "If price closes below X on a 5-minute candle",
     "justification": "Reason for entry/close/hold"  
   }
 }

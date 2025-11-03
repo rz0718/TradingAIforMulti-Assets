@@ -52,8 +52,8 @@ SYMBOL_TO_COIN = {
     "DOGEUSDT": "DOGE",
     "BNBUSDT": "BNB",
 }
-INTERVAL = "3m"  # 3-minute candles
-CHECK_INTERVAL = 3 * 60  # Check every 3 minutes (when candle closes)
+INTERVAL = "5m"  # 5-minute candles
+CHECK_INTERVAL = 5 * 60  # Check every 5 minutes (when candle closes)
 START_CAPITAL = 10000.0
 CAPITAL_PER_LLM = START_CAPITAL  # $10,000 per LLM (2 models total)
 

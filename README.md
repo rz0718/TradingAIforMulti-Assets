@@ -134,7 +134,7 @@ After completing the configuration, simply run the `main.py` file to start the b
 python main.py
 ```
 
-After the bot starts, it will begin executing trading loops at the set time interval (default 3 minutes) and print detailed information to the console.
+After the bot starts, it will begin executing trading loops at the set time interval (default 5 minutes) and print detailed information to the console.
 
 ---
 
