@@ -120,7 +120,7 @@ Get these by:
 ## Usage
 
 Once configured, the bot automatically sends:
-- Updates every `CHECK_INTERVAL` (3 minutes by default)
+- Updates every `CHECK_INTERVAL` (5 minutes by default)
 - Shows new trades if any occurred
 - Always shows current positions and portfolio summary
 - Includes AI-generated market insights

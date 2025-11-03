@@ -5,12 +5,12 @@ This allows you to preview and test the Telegram notification format.
 """
 
 from bot import utils, config
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Sample data to test the formatting
 sample_new_trades = [
     {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "coin": "BTC",
         "action": "ENTRY",
         "side": "long",
@@ -25,7 +25,7 @@ sample_new_trades = [
         "reason": "Strong bullish momentum with RSI showing oversold conditions. Price breaking above EMA resistance."
     },
     {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "coin": "ETH",
         "action": "CLOSE",
         "side": "long",

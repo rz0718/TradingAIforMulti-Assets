@@ -44,10 +44,32 @@ class TradingState:
             with open(utils.STATE_JSON, "r") as f:
                 data = json.load(f)
             self.balance = float(data.get("balance", config.START_CAPITAL))
-            # ... (More robust state loading can be added here)
-            logging.info(
-                "Loaded state from %s (balance: %.2f)", utils.STATE_JSON, self.balance
-            )
+            
+            # Load positions if they exist
+            if "positions" in data and isinstance(data["positions"], dict):
+                self.positions = data["positions"]
+                logging.info(
+                    "Loaded state from %s (balance: %.2f, positions: %d)",
+                    utils.STATE_JSON,
+                    self.balance,
+                    len(self.positions)
+                )
+                # Log each position for visibility
+                for coin, pos in self.positions.items():
+                    logging.info(
+                        "  Restored position: %s %s @ $%.4f (qty: %.4f, leverage: %dx)",
+                        coin,
+                        pos.get("side", "").upper(),
+                        pos.get("entry_price", 0),
+                        pos.get("quantity", 0),
+                        pos.get("leverage", 1)
+                    )
+            else:
+                logging.info(
+                    "Loaded state from %s (balance: %.2f, no positions)", 
+                    utils.STATE_JSON, 
+                    self.balance
+                )
         except Exception as e:
             logging.error("Failed to load state: %s", e, exc_info=True)
 
@@ -134,7 +156,7 @@ def get_llm_decisions(
     try:
         utils.log_ai_message(
             {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "direction": "sent",
                 "role": "system",
                 "content": prompts.TRADING_RULES_PROMPT,
@@ -143,7 +165,7 @@ def get_llm_decisions(
         )
         utils.log_ai_message(
             {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "direction": "sent",
                 "role": "user",
                 "content": prompt,
@@ -165,7 +187,7 @@ def get_llm_decisions(
         content = response.choices[0].message.content
         utils.log_ai_message(
             {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "direction": "received",
                 "role": "assistant",
                 "content": content,
@@ -381,8 +403,8 @@ def calculate_sharpe_ratio(
     ]
 
     # Require minimum number of data points for meaningful Sharpe calculation
-    # With 3-minute intervals, 20 points = 1 hour, 30 points = 1.5 hours
-    MIN_DATA_POINTS = 20
+    # With 5-minute intervals, 12 points = 1 hour, 18 points = 1.5 hours
+    MIN_DATA_POINTS = 12
     if len(values) < MIN_DATA_POINTS:
         return None
 
@@ -502,7 +524,7 @@ def execute_trade(
         logging.info(f"ENTRY: {coin} {side.upper()} {quantity:.4f} @ ${price:.4f}")
         
         trade_data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "coin": coin,
             "action": "ENTRY",
             "side": side,
@@ -536,7 +558,7 @@ def execute_trade(
         )
 
         trade_data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "coin": coin,
             "action": "CLOSE",
             "side": pos["side"],
@@ -580,7 +602,7 @@ def run_trading_loop(model_name: str):
             state.current_iteration_messages = []
             state.current_iteration_trades = []  # Reset trades for this iteration
 
-            header = f"\n{Fore.CYAN}{'='*20} Iteration {state.invocation_count} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {'='*20}{Style.RESET_ALL}"
+            header = f"\n{Fore.CYAN}{'='*20} Iteration {state.invocation_count} - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} {'='*20}{Style.RESET_ALL}"
             print(header)
             state.current_iteration_messages.append(utils.strip_ansi_codes(header))
 
@@ -610,7 +632,7 @@ def run_trading_loop(model_name: str):
 
                     utils.log_ai_decision(
                         {
-                            "timestamp": datetime.now().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                             "coin": coin,
                             **decision,
                         }

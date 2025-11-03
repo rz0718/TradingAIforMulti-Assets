@@ -6,7 +6,7 @@ import logging
 import csv
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -282,6 +282,6 @@ def format_trading_signal_message(
     
     lines.append("")
     lines.append("=" * 30)
-    lines.append(f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    lines.append(f"⏰ {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
     
     return "\n".join(lines)
