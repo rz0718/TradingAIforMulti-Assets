@@ -376,6 +376,10 @@ def render_portfolio_tab(state_df: pd.DataFrame, trades_df: pd.DataFrame) -> Non
     btc_caption = None
     if not btc_series.empty and len(state_df.index) > 0:
         timeline = state_df.reset_index()[["timestamp"]].sort_values("timestamp")
+        timeline['timestamp'] = pd.to_datetime(timeline['timestamp']).dt.tz_convert('UTC')
+        btc_series['timestamp'] = pd.to_datetime(btc_series['timestamp']).dt.tz_localize('UTC')
+
+
         benchmark = pd.merge_asof(
             timeline,
             btc_series.sort_values("timestamp"),
