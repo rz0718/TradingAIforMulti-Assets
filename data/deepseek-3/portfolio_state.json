@@ -1,0 +1,23 @@
+{
+  "balance": 306157.0317767465,
+  "positions": {
+    "TQQQ": {
+      "side": "long",
+      "quantity": 1570.3349282296624,
+      "entry_price": 118.09,
+      "profit_target": 121.805,
+      "stop_loss": 116.0,
+      "leverage": 1.0,
+      "confidence": 0.6,
+      "invalidation_condition": "If price closes below 116.00 on a 3-minute candle",
+      "margin": 185440.85167464084,
+      "fees_paid": 50.99623421052623,
+      "fee_rate": 0.000275,
+      "liquidity": "taker",
+      "entry_justification": "TQQQ oversold with RSI below 40, potential bounce from support, longer-term uptrend intact",
+      "last_justification": "Holding long position; price above entry, profit target not reached, stop loss not triggered despite high RSI"
+    }
+  },
+  "iteration": 18,
+  "updated_at": "2025-11-01T06:07:01.747282"
+}

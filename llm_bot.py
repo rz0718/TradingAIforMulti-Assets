@@ -24,10 +24,11 @@ from dotenv import load_dotenv
 from colorama import Fore, Style, init as colorama_init
 from prompt import TRADING_RULES_PROMPT
 from parameter import INTERVAL, START_CAPITAL, DEFAULT_RISK_FREE_RATE, EMA_LEN, RSI_LEN, MACD_FAST, MACD_SLOW, MACD_SIGNAL, MAKER_FEE_RATE, TAKER_FEE_RATE, CHECK_INTERVAL
-from config import API_KEY, API_SECRET, OPENROUTER_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, SYMBOLS, SYMBOL_TO_COIN
+from config_stock import OPENROUTER_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, SYMBOLS, SYMBOL_TO_COIN
+
 from telegram import send_telegram_message
 # from market import fetch_market_data, collect_prompt_market_data, get_binance_client
-from market import fetch_market_data, collect_prompt_market_data
+from market_alpaca import fetch_market_data, collect_prompt_market_data
 from indicators import calculate_indicators, calculate_atr_series, add_indicator_columns
 
 
@@ -244,7 +245,7 @@ class LLMBot:
             metadata=metadata,
 
         )
-        send_telegram_message(self, message)
+        send_telegram_message(message)
     
     def load_state(self) -> None:
         """Load persisted balance and positions if available."""
@@ -360,7 +361,6 @@ class LLMBot:
 
         now = datetime.now(timezone.utc)
         minutes_running = int((now - self.BOT_START_TIME).total_seconds() // 60)
-
         market_snapshots: Dict[str, Dict[str, Any]] = {}
         for symbol in SYMBOLS:
             snapshot = collect_prompt_market_data(symbol)
@@ -407,26 +407,27 @@ class LLMBot:
                 continue
             intraday = data["intraday_series"]
             long_term = data["long_term"]
-            open_interest = data["open_interest"]
-            funding_rates = data.get("funding_rates", [])
-            funding_avg_str = fmt_rate(float(np.mean(funding_rates))) if funding_rates else "N/A"
+            # open_interest = data["open_interest"]
+            # funding_rates = data.get("funding_rates", [])
+            # funding_avg_str = fmt_rate(float(np.mean(funding_rates))) if funding_rates else "N/A"
             
             prompt_lines.append(f"{coin} MARKET SNAPSHOT")
             prompt_lines.append(
-                f"- Price: {fmt(data['price'], 3)}, EMA20: {fmt(data['ema20'], 3)}, MACD: {fmt(data['macd'], 3)}, RSI(7): {fmt(data['rsi7'], 3)}"
+                f"- Price: {fmt(data['price'], 3)}, EMA20: {fmt(data['ema20'], 3)}, MACD: {fmt(data['macd'], 3)}, RSI(7): {fmt(data['rsi7'], 3)}, VWAP: {fmt(data['vwap'], 3)}"
             )
-            prompt_lines.append(
-                f"- Open Interest (latest/avg): {fmt(open_interest.get('latest'), 2)} / {fmt(open_interest.get('average'), 2)}"
-            )
-            prompt_lines.append(
-                f"- Funding Rate (latest/avg): {fmt_rate(data['funding_rate'])} / {funding_avg_str}"
-            )
+            # prompt_lines.append(
+            #     f"- Open Interest (latest/avg): {fmt(open_interest.get('latest'), 2)} / {fmt(open_interest.get('average'), 2)}"
+            # )
+            # prompt_lines.append(
+            #     f"- Funding Rate (latest/avg): {fmt_rate(data['funding_rate'])} / {funding_avg_str}"
+            # )
             prompt_lines.append("  Intraday series (3-minute, oldest → latest):")
             prompt_lines.append(f"    mid_prices: {json.dumps(intraday['mid_prices'])}")
             prompt_lines.append(f"    ema20: {json.dumps(intraday['ema20'])}")
             prompt_lines.append(f"    macd: {json.dumps(intraday['macd'])}")
             prompt_lines.append(f"    rsi7: {json.dumps(intraday['rsi7'])}")
             prompt_lines.append(f"    rsi14: {json.dumps(intraday['rsi14'])}")
+            prompt_lines.append(f"    vwap: {json.dumps(intraday['vwap'])}")
             prompt_lines.append("  Longer-term context (4-hour timeframe):")
             prompt_lines.append(
                 f"    EMA20 vs EMA50: {fmt(long_term['ema20'], 3)} / {fmt(long_term['ema50'], 3)}"
@@ -439,6 +440,7 @@ class LLMBot:
             )
             prompt_lines.append(f"    MACD series: {json.dumps(long_term['macd'])}")
             prompt_lines.append(f"    RSI14 series: {json.dumps(long_term['rsi14'])}")
+            prompt_lines.append(f"    VWAP series: {json.dumps(long_term['vwap'])}")
             prompt_lines.append("-" * 80)
 
         prompt_lines.append("ACCOUNT INFORMATION AND PERFORMANCE")
@@ -565,10 +567,10 @@ IMPORTANT:
                         }
                     ],
                     "temperature": 0.7,
-                    "max_tokens": 6000,
+                    "max_tokens": 4000,
                     "reasoning":
                     {
-                        "effort": "medium",
+                        "effort": "low",
                         "exclude": False,
                         "enabled": True,
                     }
@@ -586,6 +588,7 @@ IMPORTANT:
                     },
                 )
                 return None
+            
             result = response.json()
             content = result['choices'][0]['message']['content']
             self.log_ai_message(
@@ -1141,7 +1144,8 @@ IMPORTANT:
                                 line = f"  └─ Reason: {reason_text}"
                                 print(line)
                                 self.record_iteration_message(line)
-                                
+                
+
                 # Display portfolio summary
                 total_equity = self.calculate_total_equity()
                 total_return = ((total_equity - START_CAPITAL) / START_CAPITAL) * 100

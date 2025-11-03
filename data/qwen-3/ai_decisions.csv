@@ -1,0 +1,222 @@
+timestamp,coin,signal,reasoning,confidence
+2025-10-31T21:51:34.704021,NVDA,entry,"Strong uptrend confirmed by price above EMA20, rising MACD, and RSI(7) cooling from overbought but still bullish. 4-hour trend supports upside.",0.72
+2025-10-31T21:51:35.339505,BYND,hold,"No position held. Weak price action below EMA20, bearish MACD, and downtrend on 4-hour chart. Avoid entry.",0.0
+2025-10-31T21:51:35.675935,TSLA,entry,Bullish momentum with MACD rising and price above EMA20. RSI(7) pulled back from overbought but remains strong. 4-hour trend still favorable.,0.68
+2025-10-31T21:51:36.012425,PLTR,entry,Strong breakout above EMA20 with accelerating MACD and RSI(7) holding above 70. 4-hour trend is bullish with rising volume.,0.7
+2025-10-31T21:51:36.352952,MSTR,entry,"Sharp intraday reversal with strong MACD surge and RSI(7) >75. Despite bearish 4-hour trend, intraday momentum offers tactical long opportunity.",0.65
+2025-10-31T21:51:36.694932,SQQQ,hold,No position. RSI(7) elevated but MACD still negative. 4-hour trend bearish (EMA20 < EMA50). Avoid shorting strength in inverse ETF.,0.0
+2025-10-31T21:51:37.032734,TQQQ,close,"No position held. Price below EMA20, declining MACD, and RSI(7) falling into neutral zone. Weak momentum despite 4-hour uptrend.",0.0
+2025-10-31T21:51:37.383123,SOXL,close,"No position. RSI(7) collapsed from overbought to 38, MACD declining. Potential reversal signal—avoid longs until stabilization.",0.0
+2025-10-31T21:51:37.695465,SOXS,hold,"No position. Sideways price action, flat MACD, neutral RSI. No edge for shorting semiconductor inverse ETF currently.",0.0
+2025-10-31T21:55:48.398263,NVDA,hold,"Price is slightly below entry but above stop loss; MACD still positive albeit declining, RSI cooling from overbought. Thesis intact.",0.72
+2025-10-31T21:55:48.915768,BYND,entry,"Price below EMA20, declining MACD, RSI(7) oversold but downtrend intact; 4H shows bearish EMA crossover and weak volume.",0.65
+2025-10-31T21:55:49.190582,TSLA,hold,"Price near VWAP, RSI(7) elevated but MACD rising; 4H trend remains bullish with EMA20 > EMA50. Hold for target.",0.68
+2025-10-31T21:55:49.464167,PLTR,hold,"Minor unrealized loss; RSI cooling from overbought, MACD still strong. 4H trend bullish with rising volume support.",0.7
+2025-10-31T21:55:49.737770,MSTR,hold,"RSI(7) very high but price near VWAP; intraday uptrend intact. However, 4H shows bearish EMA crossover—monitor closely.",0.65
+2025-10-31T21:55:50.002505,SQQQ,hold,No position. MACD negative but price near resistance; RSI(7) elevated. Avoid shorting leveraged ETFs without strong edge.,0.0
+2025-10-31T21:55:50.279443,TQQQ,hold,"No position. MACD declining, RSI(7) neutral; 4H trend bullish but intraday momentum fading. Wait for clearer setup.",0.0
+2025-10-31T21:55:50.553133,SOXL,hold,"No position. MACD declining from peak, RSI(7) neutral; 4H trend strong but intraday lacks momentum for entry now.",0.0
+2025-10-31T21:55:50.825198,SOXS,hold,"No position. Price flat, MACD slightly negative, RSI neutral. No edge in this low-volatility inverse ETF currently.",0.0
+2025-10-31T21:59:54.055527,NVDA,hold,Price near EMA20 with slight pullback; MACD still positive albeit declining. Thesis intact above stop.,0.72
+2025-10-31T21:59:54.578109,BYND,entry,"Price below declining EMA20, RSI7 rising from oversold but still weak; longer-term downtrend intact with lower 4H EMA20 vs EMA50.",0.62
+2025-10-31T21:59:54.867029,TSLA,hold,Price above EMA20 with strong MACD momentum; recent consolidation healthy. Stop remains valid.,0.68
+2025-10-31T21:59:55.136357,PLTR,hold,Minor pullback after strong intraday run; RSI7 cooling from overbought but still above 60. Trend remains bullish.,0.7
+2025-10-31T21:59:55.409477,MSTR,hold,Price holding above EMA20 with strong MACD; RSI7 pulled back from extreme but still elevated. Stop not yet tested.,0.65
+2025-10-31T21:59:55.684650,SQQQ,close,No current position; RSI7 overbought in leveraged inverse ETF during broad market strength—avoid shorting strength.,0.0
+2025-10-31T21:59:55.958505,TQQQ,entry,"RSI7 oversold intraday, price near VWAP support, and 4H trend remains bullish (EMA20 > EMA50). Bounce likely.",0.58
+2025-10-31T21:59:56.228629,SOXL,hold,No position. Price consolidating near EMA20; RSI7 neutral. No clear edge—wait for breakout.,0.0
+2025-10-31T21:59:56.511815,SOXS,close,No position. RSI7 rising but in leveraged inverse ETF during semiconductor strength—high risk of short squeeze.,0.0
+2025-10-31T22:03:57.162259,NVDA,close,Price has declined below EMA20 with weakening MACD and RSI failing to hold support; stop loss proximity increases risk of margin erosion.,0.72
+2025-10-31T22:03:57.712247,BYND,entry,"Price below declining EMA20, bearish MACD, and RSI(7) rolling over from neutral; short setup with tight stop above recent swing high.",0.65
+2025-10-31T22:03:57.989113,TSLA,hold,"Uptrend intact with price above EMA20, rising MACD, and RSI(7) in bullish zone; holding for target at $460.11.",0.68
+2025-10-31T22:03:58.258357,PLTR,hold,Price holding near entry with strong intraday support; MACD and RSI(7) indicate consolidation before potential breakout.,0.7
+2025-10-31T22:03:58.523524,MSTR,hold,"Price above EMA20 with strong momentum (MACD rising, RSI(7) >70); holding for target at $276.20 despite overbought signals.",0.65
+2025-10-31T22:03:58.786534,SQQQ,hold,No position; RSI(7) elevated but MACD still negative—insufficient edge for entry.,0.0
+2025-10-31T22:03:59.105935,TQQQ,close,No position; RSI(7) oversold but MACD declining—counter-trend risk too high.,0.0
+2025-10-31T22:03:59.405213,SOXL,hold,No position; price consolidating near EMA20 with neutral RSI—no clear edge.,0.0
+2025-10-31T22:03:59.674600,SOXS,hold,No position; RSI(7) rising but price stuck below EMA20—lack of momentum for short.,0.0
+2025-10-31T22:08:02.290090,NVDA,entry,Price above EMA20 with positive MACD and RSI recovering from oversold. Strong 4-hour trend supports upside.,0.72
+2025-10-31T22:08:02.824981,BYND,hold,Short position slightly profitable; price remains below entry and VWAP. Maintain for target.,0.65
+2025-10-31T22:08:03.115070,TSLA,hold,"Position in profit with strong momentum (MACD rising, RSI elevated but not extreme). Hold for target.",0.68
+2025-10-31T22:08:03.411068,PLTR,hold,Price near VWAP with stable MACD and RSI ~72. Uptrend intact; hold for target.,0.7
+2025-10-31T22:08:03.688308,MSTR,hold,"Strong intraday momentum and above EMA20. Despite high RSI, 4-hour trend supports continuation.",0.65
+2025-10-31T22:08:03.955428,SQQQ,close,No position held; MACD near zero and price consolidating. No edge for entry.,0.0
+2025-10-31T22:08:04.306064,TQQQ,close,"No position held; RSI neutral, MACD declining. Weak momentum despite higher timeframe trend.",0.0
+2025-10-31T22:08:04.637833,SOXL,close,No position held; price below recent highs with declining MACD. Lack of strong bullish catalyst.,0.0
+2025-10-31T22:08:04.930714,SOXS,close,"No position held; price flat, MACD slightly negative. No short setup with RSI neutral.",0.0
+2025-10-31T22:12:21.340610,NVDA,hold,Price remains above EMA20 with positive MACD and RSI in neutral-bullish zone. Position performing as expected.,0.72
+2025-10-31T22:12:21.875176,BYND,close,Price approaching stop loss at $1.65; RSI(7) rising to 53 and price above VWAP indicates short-term bullish momentum invalidating bearish thesis.,0.65
+2025-10-31T22:12:22.160325,TSLA,hold,"Strong uptrend intact: price above EMA20, MACD rising, RSI(7) elevated but not extreme. Profit target still achievable.",0.68
+2025-10-31T22:12:22.445452,PLTR,hold,"Uptrend continues with price above EMA20 and VWAP. MACD stable, RSI(7) pulled back from overbought—healthy consolidation.",0.7
+2025-10-31T22:12:22.728859,MSTR,hold,Price holding above entry and EMA20. Intraday momentum remains positive despite RSI(7) cooling from peak.,0.65
+2025-10-31T22:12:23.016558,SQQQ,entry,"SQQQ in downtrend on 4-hour (EMA20 < EMA50), MACD negative but flattening. Intraday price rejected at VWAP with RSI(7) turning down from 58—short setup with tight risk.",0.62
+2025-10-31T22:12:23.288691,TQQQ,hold,"No current position. RSI(7) neutral, MACD declining but still positive. Wait for clearer momentum before entry.",0.0
+2025-10-31T22:12:23.569178,SOXL,entry,SOXL breaking above intraday resistance with rising MACD and RSI(7) at 63.8. 4-hour trend strongly bullish (EMA20 > EMA50). Favorable risk-reward setup.,0.67
+2025-10-31T22:12:23.847195,SOXS,hold,No current position. RSI(7) oversold at 32.7 but MACD flat—lacks momentum for short. Avoid counter-trend trade.,0.0
+2025-10-31T22:16:36.394998,NVDA,hold,Price remains above EMA20 with stable MACD and RSI in neutral zone. Thesis intact.,0.72
+2025-10-31T22:16:36.922762,BYND,entry,RSI7 overbought at 71.7 while price rejects VWAP; 4H trend remains bearish (EMA20 < EMA50).,0.65
+2025-10-31T22:16:37.204328,TSLA,hold,"Strong uptrend with price above EMA20 and rising MACD. RSI7 pulled back from extreme, reducing overbought risk.",0.68
+2025-10-31T22:16:37.470594,PLTR,hold,Price near VWAP with strong intraday momentum. RSI7 elevated but supported by 4H bullish structure.,0.7
+2025-10-31T22:16:37.755544,MSTR,close,Price broke below intraday EMA20 with sharp RSI7 drop to 46. 4H trend remains bearish (EMA20 < EMA50). Thesis invalidated.,0.65
+2025-10-31T22:16:38.028022,SQQQ,hold,MACD turned positive but remains weak; price hovers near entry. Maintain short with tight invalidation.,0.62
+2025-10-31T22:16:38.299681,TQQQ,hold,No position. RSI7 neutral but price below EMA20; lacks clear edge for entry.,0.0
+2025-10-31T22:16:38.574359,SOXL,hold,No position. Price near EMA20 with rising MACD but RSI7 overbought; wait for pullback confirmation.,0.0
+2025-10-31T22:16:38.850780,SOXS,entry,RSI7 oversold at 26.3 with price near 4H support. MACD stabilizing; contrarian long setup in semiconductor leveraged ETF.,0.63
+2025-10-31T22:20:47.511404,NVDA,close,Price has drifted below EMA20 and entry price. MACD and RSI weakening. Thesis invalidated as momentum fails to sustain above $205.50.,0.0
+2025-10-31T22:20:48.091676,BYND,hold,No position. RSI spiked then pulled back; MACD barely positive. Low conviction setup in illiquid stock—avoid entry.,0.0
+2025-10-31T22:20:48.396570,TSLA,hold,Price continues strong uptrend with rising MACD and RSI(7) at 83.29. Still below profit target of $460.11 and above stop loss.,0.68
+2025-10-31T22:20:48.844138,PLTR,hold,"PLTR remains in uptrend with strong momentum (MACD rising, RSI(7)=76.46). Position is profitable and within planned exit parameters.",0.7
+2025-10-31T22:20:49.140757,MSTR,hold,No position. Sharp intraday drop with RSI(7) falling to 40.22 but 4-hour trend remains bearish (EMA20 < EMA50). Avoid counter-trend trade.,0.0
+2025-10-31T22:20:49.425175,SQQQ,hold,SQQQ short is slightly profitable. Broader market (TQQQ/SOXL) shows mixed signals but no strong reversal yet. Maintain position.,0.62
+2025-10-31T22:20:49.740977,TQQQ,hold,No position. Price near VWAP with flat MACD and neutral RSI. Lacks directional conviction—wait for clearer breakout.,0.0
+2025-10-31T22:20:50.037787,SOXL,hold,No position. Moderate bullish momentum but RSI(7)=65.00 approaching overbought. Prefer to hold existing TSLA/PLTR longs over new entries.,0.0
+2025-10-31T22:20:50.329554,SOXS,close,Price stagnating at entry with declining RSI(7)=32.57 and negative MACD. Lack of upside momentum invalidates long thesis in semiconductor bearish leveraged ETF.,0.0
+2025-10-31T22:24:54.795007,NVDA,entry,"Price rebounding from EMA20 support, MACD declining but still positive, RSI(7)=41.7 not oversold. 4h trend strong (EMA20>EMA50). Favorable risk-reward.",0.65
+2025-10-31T22:24:55.349451,BYND,close,"No position held. Avoid trading: price below both 4h EMA20/50, MACD deeply negative, low price ($1.59) increases slippage risk. Not worth capital allocation.",0.0
+2025-10-31T22:24:55.639038,TSLA,hold,"Position is in profit (+$5,764), RSI(7) cooled from overbought to 67.5, still above EMA20 with strong intraday trend. Hold for target at $460.11.",0.68
+2025-10-31T22:24:55.919224,PLTR,hold,"RSI(7) remains elevated at 76.8 but price holding above EMA20 with positive MACD. Unrealized PnL +$2,075. Hold for $207.84 target.",0.7
+2025-10-31T22:24:56.204446,MSTR,close,"No position held. Despite intraday bounce, 4h trend strongly bearish (EMA20=277 < EMA50=289, RSI14=39). High ATR (12.1) increases risk. Avoid.",0.0
+2025-10-31T22:24:56.486359,SQQQ,hold,Small unrealized gain ($27). MACD slightly positive but longer-term trend still bearish (4h EMA20 < EMA50). Maintain short for $12.75 target.,0.62
+2025-10-31T22:24:56.765315,TQQQ,close,"No position held. Price below EMA20, RSI(7)=44.7 neutral, but 4h RSI14=58 after extreme overbought. High volatility and leverage risk. Not compelling.",0.0
+2025-10-31T22:24:57.061987,SOXL,close,"No position held. Trading near 4h resistance (VWAP=48.87), RSI(7)=51 neutral. MACD flat. No clear edge; better opportunities elsewhere.",0.0
+2025-10-31T22:24:57.347330,SOXS,close,"No position held. Price stuck in tight range, low ATR, RSI(7) erratic. 4h trend bearish (EMA20<EMA50). Avoid low-conviction setups.",0.0
+2025-10-31T22:28:56.170262,NVDA,hold,Price consolidating near entry with positive MACD and above VWAP; 4-hour trend remains bullish (EMA20 > EMA50).,0.65
+2025-10-31T22:28:56.706048,BYND,entry,"Price rejected from 1.69 resistance, now below EMA20 with declining RSI(7)=36.4; 4-hour EMA20<EMA50 confirms downtrend.",0.67
+2025-10-31T22:28:56.994615,TSLA,hold,Position is profitable and approaching target; RSI(7)=89.3 indicates overbought but momentum remains strong per MACD and price above EMA20.,0.68
+2025-10-31T22:28:57.276149,PLTR,hold,Bullish trend intact with price above EMA20 and strong volume; RSI(7)=77 is elevated but not extreme given momentum.,0.7
+2025-10-31T22:28:57.552791,MSTR,close,No position held; closing signal not applicable but no entry due to conflicting signals: intraday bounce vs bearish 4-hour trend (EMA20<EMA50).,0.0
+2025-10-31T22:28:57.836704,SQQQ,hold,Small profit accumulating; holding short as broader market (TQQQ/SOXL) shows consolidation without strong reversal signal.,0.62
+2025-10-31T22:28:58.112236,TQQQ,hold,"No position held; neutral intraday (RSI=49.7, MACD flat) and 4-hour RSI declining from overbought—no clear edge for entry.",0.0
+2025-10-31T22:28:58.405035,SOXL,hold,No position held; price near resistance at 49.2 but RSI(7)=54.4 and MACD declining—insufficient conviction for long entry.,0.0
+2025-10-31T22:28:58.690899,SOXS,hold,"No position held; RSI(7)=47.1 neutral, price near EMA20 but 4-hour trend bearish—no actionable setup.",0.0
+2025-10-31T22:33:00.688937,NVDA,hold,Price remains above EMA20 with positive MACD and RSI trending upward. Current position is profitable and thesis intact.,0.65
+2025-10-31T22:33:01.353920,BYND,hold,"Short position slightly in profit; price below EMA20, RSI(7) declining toward oversold. No invalidation signal yet.",0.67
+2025-10-31T22:33:01.703443,TSLA,close,RSI(7) at 87.78 indicates extreme overbought conditions; approaching profit target of $460.11. Take profits to lock in gains.,0.68
+2025-10-31T22:33:02.069826,PLTR,hold,Price near VWAP and EMA20 support; RSI(7) pulled back from overbought but still healthy. Profit target not yet reached.,0.7
+2025-10-31T22:33:02.395071,MSTR,entry,"Price below 4-hour EMA20/50 death cross; intraday momentum fading (MACD declining), RSI(7) neutral. Short setup with defined risk.",0.64
+2025-10-31T22:33:02.710466,SQQQ,close,Approaching profit target of $12.75; current price at $12.96. MACD flattening and RSI(7) rising—take small profit to reduce risk.,0.62
+2025-10-31T22:33:03.035008,TQQQ,hold,No position. RSI(7) rising but MACD weak; lacks strong momentum for entry. Wait for clearer signal.,0.0
+2025-10-31T22:33:03.373362,SOXL,hold,"No position. Uptrend intact on 4-hour, but intraday RSI(7) at 62.7—moderate momentum. Not high-conviction enough for entry now.",0.0
+2025-10-31T22:33:03.700605,SOXS,hold,"No position. Price in downtrend on 4-hour (EMA20 < EMA50), but intraday action flat. Avoid shorting low-volatility traps.",0.0
+2025-10-31T22:37:04.107906,NVDA,hold,Price holding above EMA20 with positive MACD and RSI trending up from neutral. Current position performing as expected.,0.65
+2025-10-31T22:37:04.713726,BYND,hold,Price near VWAP and declining from recent highs. RSI(7) oversold but still in downtrend. Short thesis intact.,0.67
+2025-10-31T22:37:05.063342,TSLA,entry,"RSI(7) dropped sharply from extreme overbought (>85) to 72.7, signaling exhaustion. Price above VWAP but momentum fading per MACD dip. Bearish reversal setup.",0.68
+2025-10-31T22:37:05.352278,PLTR,hold,"Strong uptrend confirmed by EMA, MACD, and RSI(7) at 82.8 (overbought but momentum intact). Hold for profit target.",0.7
+2025-10-31T22:37:05.634847,MSTR,close,Price broke above intraday resistance and RSI(7) rising to 70.7. Short thesis invalidated as momentum turns positive against 4-hour downtrend.,0.0
+2025-10-31T22:37:05.917098,SQQQ,entry,Ultra ETF showing reversal from oversold RSI(7)=39.7. Price stabilizing near VWAP with MACD flattening. Hedge against broad market dip.,0.62
+2025-10-31T22:37:06.327124,TQQQ,hold,No position. RSI(7) rising but MACD weak. Avoid entering leveraged long without stronger momentum confirmation.,0.0
+2025-10-31T22:37:06.606789,SOXL,close,No position. RSI(7) extremely overbought at 73.2 with minimal pullback. Avoid chasing momentum at resistance.,0.0
+2025-10-31T22:37:06.893042,SOXS,entry,RSI(7) at 30.6 (oversold) with price near VWAP support. Inverse ETF showing potential bounce as SOXL overextended. Low-cost mean-reversion play.,0.66
+2025-10-31T22:41:12.257369,NVDA,hold,Price remains above EMA20 with positive MACD and strong uptrend; RSI(7) pulled back from overbought but still healthy.,0.65
+2025-10-31T22:41:12.802717,BYND,hold,Price continues to drift lower within downtrend; RSI(7) remains oversold but no reversal signal yet.,0.67
+2025-10-31T22:41:13.091600,TSLA,close,RSI(7) remains elevated above 70 and price holds near VWAP with strong intraday momentum; short thesis weakening.,0.68
+2025-10-31T22:41:13.368255,PLTR,hold,Price near all-time highs on strong volume; RSI(7) pulled back from extreme but remains bullish; trend intact.,0.7
+2025-10-31T22:41:13.654858,MSTR,entry,Price broke above intraday EMA20 with rising MACD and volume; 4-hour trend reversing after deep oversold RSI.,0.69
+2025-10-31T22:41:13.931799,SQQQ,close,Price failed to hold support and broke below EMA20; RSI(7) oversold but no reversal confirmation; weak momentum.,0.62
+2025-10-31T22:41:14.207802,TQQQ,entry,Price above EMA20 with rising MACD and RSI(7) breaking into bullish territory; strong relative strength vs QQQ.,0.71
+2025-10-31T22:41:14.484004,SOXL,close,No existing position; RSI(7) extremely overbought at 79; avoid chasing momentum at resistance.,0.0
+2025-10-31T22:41:14.771120,SOXS,close,"Price broke below EMA20 with declining MACD; RSI(7) oversold but semiconductor sector showing strength (SOXL up), making short-side leveraged ETF weak.",0.66
+2025-10-31T22:45:18.649661,NVDA,hold,Price remains above EMA20 and stop loss; RSI(7) elevated but still in uptrend per 4H EMA alignment.,0.65
+2025-10-31T22:45:19.180642,BYND,hold,"Short thesis intact: price below EMA20, declining RSI, and 4H trend remains bearish (EMA20 < EMA50).",0.67
+2025-10-31T22:45:19.914585,TSLA,entry,"Strong intraday uptrend (price > EMA20, positive MACD), 4H EMA20 > EMA50 confirms bullish context; RSI(7) cooled from overbought.",0.72
+2025-10-31T22:45:20.210911,PLTR,hold,Position near profit target; price pulled back from RSI(7) overbought but remains above EMA20 and VWAP.,0.7
+2025-10-31T22:45:20.486979,MSTR,close,"Price below entry, weak 4H trend (EMA20 < EMA50), and MACD still negative on 4H; thesis invalidated by bearish higher timeframe.",0.69
+2025-10-31T22:45:20.764908,SQQQ,entry,"RSI(7) oversold at 29.87, price at 4H support near VWAP; potential bounce as QQQ likely stabilizes (TQQQ still strong).",0.68
+2025-10-31T22:45:21.042444,TQQQ,hold,Uptrend intact with price above EMA20 and rising MACD; 4H trend strongly bullish (EMA20 > EMA50).,0.71
+2025-10-31T22:45:21.335290,SOXL,close,"RSI(7) extremely overbought at 85.0; no position currently, but not entering due to exhaustion signal.",0.0
+2025-10-31T22:45:21.610907,SOXS,entry,"RSI(7) deeply oversold at 18.0, price near 4H support; inverse SOXL suggests potential tech sector bounce.",0.7
+2025-10-31T22:49:24.358093,NVDA,hold,Price holding above EMA20 with positive MACD; RSI cooled from overbought. Thesis intact.,0.65
+2025-10-31T22:49:24.864128,BYND,hold,"Price stable near entry, downtrend intact on 4H with EMA20 < EMA50. RSI neutral.",0.67
+2025-10-31T22:49:25.124345,TSLA,hold,"Minor pullback within uptrend; MACD still positive, price above EMA20. Wait for confirmation.",0.72
+2025-10-31T22:49:25.431764,PLTR,hold,"RSI7 dropped sharply from overbought, now neutral. Price near VWAP; monitor for reversal.",0.7
+2025-10-31T22:49:25.714488,MSTR,entry,"RSI7 extremely overbought (78.6), 4H trend bearish (EMA20 < EMA50), strong intraday momentum fading.",0.69
+2025-10-31T22:49:25.969475,SQQQ,close,"Long SQQQ contradicts strong Nasdaq momentum (TQQQ up, SOXL up). RSI oversold but trend opposes position.",0.0
+2025-10-31T22:49:26.230859,TQQQ,hold,"Uptrend intact, RSI7 elevated but not extreme, price above EMA20 and VWAP. Favorable risk-reward.",0.71
+2025-10-31T22:49:26.503312,SOXL,entry,"Strong momentum, RSI7 pulled back from extreme, price above EMA20 and VWAP. Semiconductor sector strength.",0.73
+2025-10-31T22:49:26.779618,SOXS,close,Long SOXS opposes strong semiconductor uptrend (SOXL rising). RSI7 deeply oversold but sector momentum favors long SOXL.,0.0
+2025-10-31T22:56:56.485013,NVDA,hold,Price remains above EMA20 with positive MACD; stop loss at $202.50 not breached.,0.65
+2025-10-31T22:56:57.003021,BYND,close,"RSI(7) rebounded sharply to 50.96 from oversold levels; price broke VWAP resistance at $1.58, invalidating short thesis.",0.67
+2025-10-31T22:56:57.284283,TSLA,close,RSI(7) at 78.44 indicates overbought; price stalled below VWAP and recent highs despite strong momentum—risk of reversal increases.,0.72
+2025-10-31T22:56:57.562480,PLTR,hold,Price stabilized near EMA20 after RSI cooled from extreme highs; stop loss at $198.50 intact.,0.7
+2025-10-31T22:56:57.837626,MSTR,close,Intraday uptrend strengthened with price above EMA20 and rising VWAP; short position increasingly risky despite bearish 4-hour trend.,0.69
+2025-10-31T22:56:58.109844,SQQQ,hold,"No position held; RSI(7) recovering but still weak, no clear short setup yet.",0.0
+2025-10-31T22:56:58.384116,TQQQ,hold,"Price remains above EMA20 and VWAP; pullback in RSI(7) to 63.6 is healthy, stop at $117.50 not hit.",0.71
+2025-10-31T22:56:58.649794,SOXL,close,"Price failed to hold above entry level of $49.88 and broke below VWAP; RSI(7) dropped from 84 to 60, showing momentum loss.",0.73
+2025-10-31T22:56:58.970496,SOXS,hold,No position held; RSI(7) recovering from oversold but price still below EMA20—wait for clearer short confirmation.,0.0
+2025-10-31T23:01:24.498347,NVDA,hold,"Price remains above EMA20 with positive MACD and strong 4H trend. RSI(7) cooled from overbought, supporting continued upside toward $209 target.",0.65
+2025-10-31T23:01:25.020579,BYND,hold,"No position held. RSI(7) rising but price below EMA20, 4H trend bearish (EMA20<EMA50). No clear edge for entry.",0.0
+2025-10-31T23:01:25.339600,TSLA,close,"No position held, but RSI(7)=81.8 indicates extreme overbought conditions. Strong intraday momentum but 4H RSI cooling from 80s. Avoid chasing.",0.0
+2025-10-31T23:01:25.628212,PLTR,hold,"Long position performing well. RSI(7) cooled to 39.5 from overbought, providing healthy pullback. 4H trend remains strong with high volume.",0.7
+2025-10-31T23:01:25.897945,MSTR,entry,4H trend bearish (EMA20<EMA50) despite intraday bounce. RSI(14) rising from oversold but MACD still deeply negative. Short into resistance at $274.,0.72
+2025-10-31T23:01:26.180644,SQQQ,hold,No position held. RSI(7) recovering from oversold but price below EMA20. 4H trend bearish (EMA20<EMA50). Wait for clearer reversal signal.,0.0
+2025-10-31T23:01:26.460058,TQQQ,hold,"Long position near breakeven. RSI(7) recovered to 65 after dip, MACD positive. 4H trend strong with EMA20>EMA50. Hold for $121.2 target.",0.71
+2025-10-31T23:01:26.748353,SOXL,hold,No position held. RSI(7) cooled from overbought but remains in bullish zone. Price above EMA20 with strong 4H trend. Monitor for entry if pullback occurs.,0.0
+2025-10-31T23:01:27.041105,SOXS,hold,No position held. RSI(7) recovering from oversold but price below EMA20. 4H trend bearish (EMA20<EMA50). Avoid longs; shorts lack momentum confirmation.,0.0
+2025-10-31T23:05:25.126923,NVDA,hold,Price remains above EMA20 and stop loss level; MACD still positive albeit declining. Uptrend intact.,0.65
+2025-10-31T23:05:25.636963,BYND,hold,No position held. Price below 4-hour EMA20/EMA50 with weak momentum; no high-conviction setup.,0.0
+2025-10-31T23:05:25.932911,TSLA,hold,No position held. RSI(7) extremely elevated at 75.3; approaching overbought. Avoid chasing momentum here.,0.0
+2025-10-31T23:05:26.209059,PLTR,hold,"Price holding above entry and stop; RSI(7) cooled to 38 from overbought, suggesting healthy pullback within uptrend.",0.7
+2025-10-31T23:05:26.561764,MSTR,hold,"Short position profitable as price dropped from 273.57 to 272.69. RSI(7) fell sharply to 55.5, supporting bearish momentum.",0.72
+2025-10-31T23:05:26.830197,SQQQ,hold,No position held. Price range-bound near VWAP; MACD flat and negative. No edge for entry.,0.0
+2025-10-31T23:05:27.106139,TQQQ,hold,Long position slightly profitable. Price above EMA20 and VWAP; MACD stable. Maintain position toward $121.20 target.,0.71
+2025-10-31T23:05:27.383358,SOXL,hold,No position held. Price pulled back from highs; RSI(7) dropped to 48.5. Wait for clearer momentum confirmation.,0.0
+2025-10-31T23:05:27.655431,SOXS,hold,No position held. Price near EMA20 with flat MACD. No strong bearish catalyst despite downtrend on 4-hour.,0.0
+2025-10-31T23:09:30.744445,NVDA,hold,Price remains above EMA20 and stop loss level; momentum slightly cooling but trend intact.,0.65
+2025-10-31T23:09:31.740651,BYND,entry,Price below declining EMA20 on 4H; RSI neutral; VWAP rejection; bearish longer-term structure with high volume.,0.68
+2025-10-31T23:09:32.017501,TSLA,close,RSI(7) extremely overbought at 77.97; price near VWAP resistance; momentum fading per declining MACD.,0.0
+2025-10-31T23:09:32.285553,PLTR,hold,Price stabilizing near EMA20 after pullback; RSI recovering from oversold; stop loss intact.,0.7
+2025-10-31T23:09:32.541937,MSTR,hold,"Short thesis remains valid: 4H downtrend (EMA20 < EMA50), weak RSI; price pulling back toward entry but below VWAP.",0.72
+2025-10-31T23:09:32.797028,SQQQ,entry,RSI rising from oversold; MACD stabilizing; inverse ETF may benefit from market consolidation or pullback in tech.,0.62
+2025-10-31T23:09:33.068508,TQQQ,hold,Price holding above EMA20; RSI neutral; aligned with strong 4H uptrend; minor pullback within bullish structure.,0.71
+2025-10-31T23:09:33.353998,SOXL,close,RSI(7) dropped sharply from overbought to 46.6; price below VWAP; momentum fading per declining MACD.,0.0
+2025-10-31T23:09:33.640093,SOXS,entry,RSI(7) rising from extreme oversold; price stabilizing near support; inverse semiconductor ETF may rebound on sector pullback.,0.64
+2025-10-31T23:13:36.417418,NVDA,hold,Price remains above EMA20 and stop loss level; short-term RSI cooling off but trend intact.,0.65
+2025-10-31T23:13:36.955071,BYND,close,Price breached VWAP and is testing resistance; short thesis weakening as intraday momentum turns positive.,0.68
+2025-10-31T23:13:37.252744,TSLA,entry,"Strong uptrend confirmed by EMA alignment, MACD positive, and volume above average; pullback offers entry.",0.73
+2025-10-31T23:13:37.532337,PLTR,hold,Position slightly in profit; RSI oversold but price holding above EMA20—wait for bounce or invalidation.,0.7
+2025-10-31T23:13:37.817750,MSTR,close,Intraday RSI rebounding and price above VWAP; short squeeze risk increases as market stabilizes.,0.72
+2025-10-31T23:13:38.106000,SQQQ,hold,Neutral price action near entry; no strong signal to exit yet but low conviction—monitor closely.,0.62
+2025-10-31T23:13:38.388798,TQQQ,hold,Holding minor profit; price consolidating near VWAP with healthy MACD—let runner work toward target.,0.71
+2025-10-31T23:13:38.673662,SOXL,hold,No position held; RSI cooling from overbought but no clear entry signal yet.,0.0
+2025-10-31T23:13:38.955434,SOXS,hold,Position at breakeven; RSI rising into momentum zone—allow trade room to develop.,0.64
+2025-10-31T23:21:44.356532,NVDA,hold,Price remains above EMA20 and stop level; MACD declining but still positive. Hold per existing plan.,0.65
+2025-10-31T23:21:44.879975,BYND,entry,"Downtrend confirmed on 4H (EMA20 < EMA50, falling MACD/RSI). Intraday price rejected at VWAP with bearish MACD crossover.",0.68
+2025-10-31T23:21:45.155600,TSLA,hold,Price holding near entry; 4H trend remains bullish (EMA20 > EMA50). RSI cooling from overbought but still supportive.,0.73
+2025-10-31T23:21:45.419181,PLTR,hold,Trading near VWAP with stable EMA support. 4H trend strong; intraday RSI neutral but not bearish.,0.7
+2025-10-31T23:21:45.690609,MSTR,entry,"Strong bearish divergence: 4H shows downtrend (EMA20 < EMA50, negative MACD) while price rallies intraday on low relative volume.",0.72
+2025-10-31T23:21:45.967216,SQQQ,close,"Position underwater; RSI(7) oversold but 4H trend remains bearish (EMA20 < EMA50). Invalidation condition not triggered, but low reward/risk given proximity to stop.",0.62
+2025-10-31T23:21:46.233390,TQQQ,hold,Bullish intraday momentum with RSI rising and price above EMA20. 4H trend intact. Hold to target.,0.71
+2025-10-31T23:21:46.510706,SOXL,hold,No position. RSI(7) declining into neutral zone; 4H trend bullish but intraday momentum fading. No entry signal.,0.0
+2025-10-31T23:21:46.785681,SOXS,close,Flat PnL with weakening momentum (RSI7 dropping from 59 to 56). 4H trend remains bearish but intraday setup lacks conviction. Close to redeploy capital.,0.64
+2025-10-31T23:26:35.205071,NVDA,hold,Price near EMA20 with RSI(7)=28.8 indicating oversold but still above stop. MACD declining but position intact.,0.65
+2025-10-31T23:26:35.736015,BYND,hold,"Short position slightly profitable; 4-hour RSI14=41.5 still below 50, no invalidation triggered.",0.68
+2025-10-31T23:26:36.016611,TSLA,close,"Price at 455.89, approaching stop_loss=450.0. RSI(7)=46 shows weakening momentum; 4-hour MACD rising but intraday trend broken.",0.73
+2025-10-31T23:26:36.353073,PLTR,hold,Slight dip but still above stop_loss=198.5; RSI(7)=35.1 not oversold enough to exit early.,0.7
+2025-10-31T23:26:36.637108,MSTR,close,Short position losing; price rising with RSI(7)=64.2 and 4-hour MACD still negative but intraday momentum bullish. Stop not hit but thesis weakening.,0.72
+2025-10-31T23:26:36.917406,SQQQ,hold,No position; neutral RSI and MACD. No edge for entry.,0.0
+2025-10-31T23:26:37.203753,TQQQ,hold,"Price at 118.945, above stop_loss=117.5. RSI(7)=48.9 neutral; 4-hour trend still bullish per EMA20>EMA50.",0.71
+2025-10-31T23:26:37.481764,SOXL,hold,No position; RSI and MACD neutral. No clear entry signal.,0.0
+2025-10-31T23:26:37.766771,SOXS,hold,"No position; price near EMA20, RSI neutral. No edge for short or long.",0.0
+2025-10-31T23:30:45.165162,NVDA,hold,Price remains above stop loss at $202.50; RSI(7)=24.6 indicates oversold but trend still intact per 4h EMA alignment. Hold for target $209.00.,0.65
+2025-10-31T23:30:45.695423,BYND,hold,Short position profitable; 4h RSI14=41.6 < 50 and price below $1.67. Intraday RSI(7)=61.5 not yet triggering invalidation. Hold for $1.55 target.,0.68
+2025-10-31T23:30:45.990966,TSLA,entry,"Price above EMA20, MACD positive at 1.43, intraday pullback to support near $456. Strong volume and 4h uptrend support long with 2:1 R:R.",0.62
+2025-10-31T23:30:46.276697,PLTR,hold,Position slightly underwater but above stop at $198.50. RSI(7)=26.2 oversold; 4h trend remains bullish. Hold for target $207.84.,0.7
+2025-10-31T23:30:46.556526,MSTR,entry,"4h trend bearish (EMA20=278.4 < EMA50=289.3), intraday price rejected at $274.6. MACD declining from peak; short with tight stop above recent high.",0.64
+2025-10-31T23:30:46.847686,SQQQ,close,No existing position; RSI(7)=66.2 overbought but 4h trend still down. Avoid longs in inverse ETFs during broad market uncertainty.,0.0
+2025-10-31T23:30:47.149027,TQQQ,hold,Slight pullback but above stop at $117.50. 4h trend remains bullish; RSI(7)=33.0 oversold may trigger bounce toward $121.20 target.,0.71
+2025-10-31T23:30:47.430906,SOXL,close,No existing position; intraday downtrend with RSI(7)=33.7 oversold but 4h trend up. Avoid counter-trend longs without clearer reversal signal.,0.0
+2025-10-31T23:30:47.718700,SOXS,close,No existing position; RSI(7)=63.5 rising but 4h trend bearish (EMA20 < EMA50). Avoid shorting oversold inverse ETF without stronger confirmation.,0.0
+2025-10-31T23:34:54.880962,NVDA,hold,"Price slightly above entry, holding above stop at $202.50. MACD negative but minor; monitor for reversal confirmation.",0.65
+2025-10-31T23:34:55.412815,BYND,hold,Short position slightly profitable; price below entry and 4-hour RSI14 remains below 50. No invalidation signal yet.,0.68
+2025-10-31T23:34:55.701907,TSLA,hold,"Price stable near entry, above stop at $452.00. MACD still positive though declining; allow room for target at $465.",0.62
+2025-10-31T23:34:55.974426,PLTR,close,RSI(7) at 24.21 indicates oversold but MACD declining and price below EMA20. Thesis invalidated by continued weakness and failure to hold support.,0.7
+2025-10-31T23:34:56.258170,MSTR,close,Price rising toward stop loss at $278; intraday RSI(7)=73.56 shows strong momentum. 4-hour trend still bearish but short-term risk too high.,0.64
+2025-11-01T06:07:58.099708,NVDA,entry,"NVDA is deeply oversold (RSI7=17.9), price near 4-hour VWAP support, MACD stabilizing after sharp drop. High reward-to-risk setup with 2.5:1 ratio.",0.72
+2025-11-01T06:07:58.640919,BYND,close,Current price ($1.65) is above stop loss ($1.67) threshold. Short thesis invalidated as price failed to break down and is now testing resistance.,0.0
+2025-11-01T06:07:58.930217,TSLA,hold,"Position performing as expected with strong momentum (MACD rising, RSI7=81.3). Maintain until profit target ($465) or stop ($452) is hit.",0.62
+2025-11-01T06:07:59.213594,PLTR,entry,"PLTR shows bullish 4-hour trend (EMA20>EMA50), intraday RSI7 oversold (30.3), and price near VWAP support. Good risk-reward setup.",0.65
+2025-11-01T06:07:59.495518,MSTR,hold,"Short position profitable with price trending down. 4-hour EMA20 (276.8) still below EMA50 (287.8), maintaining bearish structure.",0.64
+2025-11-01T06:07:59.786913,SQQQ,close,"SQQQ is overbought (RSI7=73.8) in a downtrend (4-hour EMA20<EMA50). No position exists, but not suitable for entry due to weak trend structure.",0.0
+2025-11-01T06:08:00.187542,TQQQ,entry,TQQQ oversold (RSI7=29.0) with bullish 4-hour trend (EMA20>EMA50). Intraday MACD stabilizing near support. Strong risk-reward potential.,0.68
+2025-11-01T06:08:00.468480,SOXL,close,"SOXL deeply oversold (RSI7=21.8) but in strong 4-hour uptrend. No position exists, but high volatility makes entry risky without clearer reversal signal.",0.0
+2025-11-01T06:08:00.756256,SOXS,close,"SOXS overbought (RSI7=73.7) in downtrend (4-hour EMA20<EMA50). No position exists, but shorting here is risky due to low absolute price and high slippage potential.",0.0

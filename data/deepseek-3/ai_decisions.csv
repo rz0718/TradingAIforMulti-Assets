@@ -1,0 +1,28 @@
+timestamp,coin,signal,reasoning,confidence
+2025-10-31T22:24:25.256354,NVDA,hold,"Mixed signals, momentum fading, no clear edge",0
+2025-10-31T22:24:25.788376,BYND,hold,"RSI overbought, though improving MACD, avoid due to high risk",0
+2025-10-31T22:24:26.085209,TSLA,hold,"Strong uptrend but RSI overbought, risk of pullback, wait for better entry",0
+2025-10-31T22:24:26.377322,PLTR,hold,"Uptrend but RSI overbought, similar to TSLA, avoid entry at high levels",0
+2025-10-31T22:24:26.660308,MSTR,hold,"Mixed signals, intraday pullback, longer-term downtrend, no clear direction",0
+2025-10-31T22:24:26.944732,SQQQ,hold,"Inverse ETF, no strong bullish or bearish signal, avoid",0
+2025-10-31T22:24:27.247413,TQQQ,entry,"TQQQ oversold with RSI below 40, potential bounce from support, longer-term uptrend intact",0.6
+2025-10-31T22:24:27.548355,SOXL,entry,"SOXL in strong uptrend, above EMA, MACD positive, semiconductor sector bullish, good risk-reward",0.7
+2025-10-31T22:24:27.828853,SOXS,hold,"Bearish ETF, oversold but no clear reversal signal, avoid as bullish on semiconductors",0
+2025-10-31T22:43:52.617399,NVDA,hold,"Bullish trend but RSI near overbought, avoiding new entry",0.7
+2025-10-31T22:43:53.688550,BYND,hold,"Oversold but downtrend, no clear reversal signal",0.6
+2025-10-31T22:43:53.971187,TSLA,hold,"Uptrend intact but RSI high, avoiding new entry",0.7
+2025-10-31T22:43:54.242693,PLTR,hold,"Very overbought RSI, high risk of pullback",0.8
+2025-10-31T22:43:54.524730,MSTR,hold,"Overbought conditions, no edge for new entry",0.7
+2025-10-31T22:43:54.804012,SQQQ,hold,"Oversold but trend down, contradicting current longs",0.6
+2025-10-31T22:43:55.085675,TQQQ,hold,Holding long position as uptrend and momentum remain positive,0.7
+2025-10-31T22:43:55.370958,SOXL,hold,"Holding long position but RSI overbought, monitoring for pullback",0.6
+2025-10-31T22:43:55.649674,SOXS,hold,"Oversold but inverse to current positions, avoiding entry",0.6
+2025-10-31T23:00:22.748321,NVDA,hold,"Mixed signals; price above EMA but RSI cooling, no strong edge for entry",0.5
+2025-10-31T23:00:23.799363,BYND,hold,Bearish trend but low conviction; avoiding due to high volatility and low price,0.4
+2025-10-31T23:00:24.238280,TSLA,hold,"Overbought RSI; trend up but risk of pullback, no clear entry",0.4
+2025-10-31T23:00:24.545409,PLTR,hold,"Pullback from highs, longer-term bullish but RSI not oversold; waiting for better setup",0.5
+2025-10-31T23:00:24.816003,MSTR,hold,"Mixed signals; intraday overbought but longer-term bearish, avoiding",0.4
+2025-10-31T23:00:25.091680,SQQQ,hold,"Inverse ETF; downtrend aligns with bullish tech view, no entry signal",0.3
+2025-10-31T23:00:25.393251,TQQQ,hold,"Holding long position; price above entry, profit target not reached, stop loss not triggered despite high RSI",0.6
+2025-10-31T23:00:25.693720,SOXL,hold,"Holding long position;接近 profit target, trend up, exit conditions not met",0.7
+2025-10-31T23:00:25.973249,SOXS,hold,"Inverse semiconductor ETF; downtrend, oversold but no compelling entry against current bullish bias",0.3

@@ -4,7 +4,7 @@ import numpy as np
 import logging
 from parameter import INTERVAL, EMA_LEN, RSI_LEN, MACD_FAST, MACD_SLOW, MACD_SIGNAL
 from indicators import calculate_indicators, calculate_atr_series, add_indicator_columns
-from config import SYMBOL_TO_COIN, API_KEY, API_SECRET
+from config_stock import SYMBOL_TO_COIN, API_KEY, API_SECRET
 print(SYMBOL_TO_COIN)
 import yfinance as yf
 from requests.exceptions import RequestException, Timeout

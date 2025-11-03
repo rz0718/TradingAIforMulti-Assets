@@ -19,6 +19,7 @@ import pandas as pd
 import numpy as np
 
 from llm_bot import LLMBot
+from telegram import send_telegram_message
 from parameter import START_CAPITAL, CHECK_INTERVAL, DEFAULT_RISK_FREE_RATE
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -172,8 +173,8 @@ class MultiBotManager:
                         decisions = bot.call_llm_api(prompt)
                         
                         if decisions:
-                            from config import SYMBOL_TO_COIN
-                            from market import fetch_market_data
+                            from config_stock import SYMBOL_TO_COIN
+                            from market_alpaca import fetch_market_data
                             
                             # Process decisions for each coin
                             for coin in SYMBOL_TO_COIN.values():
@@ -225,6 +226,8 @@ class MultiBotManager:
                             DEFAULT_RISK_FREE_RATE,
                         )
                         
+                        if bot.current_iteration_messages:
+                            send_telegram_message("\n".join(bot.current_iteration_messages))
                         # Log portfolio state
                         bot.log_portfolio_state()
                         bot.save_state()
@@ -495,36 +498,3 @@ class MultiBotManager:
         print("=" * 100)
         print(df.to_string(index=False))
         print("=" * 100 + "\n")
-
-
-def main():
-    """Example usage of MultiBotManager."""
-    manager = MultiBotManager()
-    
-    # Add multiple bots with different models
-    bot_ids = [
-        manager.add_bot("deepseek-chat", "deepseek-1"),
-        manager.add_bot("anthropic/claude-3.5-sonnet", "claude-1"),
-        manager.add_bot("openai/gpt-4", "gpt4-1"),
-    ]
-    
-    print(f"Added {len(bot_ids)} bots: {', '.join(bot_ids)}")
-    print("\nStarting all bots...")
-    manager.start_all_bots()
-    
-    try:
-        # Run for a while, periodically updating performance
-        while True:
-            time.sleep(180)  # Update every 5 minutes
-            manager.update_performance_snapshot()
-            manager.print_comparison()
-    except KeyboardInterrupt:
-        print("\nStopping all bots...")
-        manager.stop_all_bots()
-        manager.update_performance_snapshot()
-        manager.print_comparison()
-
-
-if __name__ == "__main__":
-    main()
-

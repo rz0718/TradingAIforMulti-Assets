@@ -1,0 +1,4 @@
+timestamp,coin,action,side,quantity,price,profit_target,stop_loss,leverage,confidence,pnl,balance_after,reason
+2025-10-31T22:24:27.546208,TQQQ,ENTRY,long,1570.3349282296624,118.09,121.805,116.0,1,0.6,0,314508.15209114866,"TQQQ oversold with RSI below 40, potential bounce from support, longer-term uptrend intact | Fees: $51.00"
+2025-10-31T22:24:27.828181,SOXL,ENTRY,long,6185.86956521738,48.96,50.6,48.5,1,0.7,0,11564.691630279645,"SOXL in strong uptrend, above EMA, MACD positive, semiconductor sector bullish, good risk-reward | Fees: $83.29"
+2025-11-01T06:07:01.745812,SOXL,CLOSE,long,6185.86956521738,47.65,0,0,1.0,0,-8267.833766576086,306157.0317767465,Stop loss hit | Gross: $-8103.49 | Fees: $164.34
