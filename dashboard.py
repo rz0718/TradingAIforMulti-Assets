@@ -28,8 +28,8 @@ TRADES_CSV = DATA_DIR / "trade_history.csv"
 DECISIONS_CSV = DATA_DIR / "ai_decisions.csv"
 MESSAGES_CSV = DATA_DIR / "ai_messages.csv"
 ENV_PATH = BASE_DIR / ".env"
-DEFAULT_RISK_FREE_RATE = 0.0
-DEFAULT_SNAPSHOT_SECONDS = 180.0
+DEFAULT_RISK_FREE_RATE = 0.04
+DEFAULT_SNAPSHOT_SECONDS = 300.0
 DEFAULT_START_CAPITAL = 10_000.0
 
 COIN_TO_SYMBOL: Dict[str, str] = {
@@ -374,36 +374,53 @@ def estimate_period_seconds(index: pd.Index, default: float = DEFAULT_SNAPSHOT_S
     return float(period_seconds)
 
 
-def compute_sharpe_ratio(trades_df: pd.DataFrame) -> float | None:
-    """Compute annualized Sharpe ratio from realized (closed) trades."""
-    if trades_df.empty or "action" not in trades_df.columns:
+MIN_RETURNS_FOR_SHARPE = int(60 / (DEFAULT_SNAPSHOT_SECONDS / 60))
+
+
+def compute_sharpe_ratio(state_df: pd.DataFrame, risk_free_rate: float) -> float | None:
+    """Compute annualized Sharpe ratio from equity snapshots."""
+    if state_df.empty or "total_equity" not in state_df.columns:
         return None
 
-    actions = trades_df["action"].astype(str).str.upper()
-    closes = trades_df.loc[actions == "CLOSE"].copy()
-    if closes.empty or "balance_after" not in closes.columns:
+    equity = pd.to_numeric(state_df["total_equity"], errors="coerce").dropna()
+    if equity.size < 2:
         return None
 
-    closes.sort_values("timestamp", inplace=True)
-    closes = closes.set_index("timestamp")
+    try:
+        equity = equity.sort_index()
+    except Exception:
+        pass
 
-    balances = pd.to_numeric(closes["balance_after"], errors="coerce").dropna()
-    if balances.size < 2:
+    log_equity = np.log(equity)
+    log_returns = log_equity.diff().dropna()
+    if log_returns.empty:
         return None
 
-    returns = balances.pct_change().dropna()
-    if returns.empty:
+    if log_returns.size < MIN_RETURNS_FOR_SHARPE:
         return None
 
-    std = returns.std()
-    if std is None or np.isclose(std, 0.0):
+    period_seconds = estimate_period_seconds(equity.index)
+    if not np.isfinite(period_seconds) or period_seconds <= 0:
         return None
-
-    period_seconds = estimate_period_seconds(closes.index)
 
     periods_per_year = (365 * 24 * 60 * 60) / period_seconds
-    sharpe = returns.mean() / std * np.sqrt(periods_per_year)
-    return float(sharpe) if np.isfinite(sharpe) else None
+    if not np.isfinite(periods_per_year) or periods_per_year <= 0:
+        return None
+
+    per_period_rf = np.log(1.0 + risk_free_rate / periods_per_year)
+    mean_excess = log_returns.mean() - per_period_rf
+    if not np.isfinite(mean_excess):
+        return None
+
+    std = log_returns.std(ddof=1)
+    if std is None or std <= 0 or not np.isfinite(std):
+        return None
+
+    sharpe = mean_excess / std * np.sqrt(periods_per_year)
+    if not np.isfinite(sharpe):
+        return None
+
+    return float(sharpe)
 
 
 def compute_sortino_ratio(state_df: pd.DataFrame, risk_free_rate: float) -> float | None:
@@ -508,7 +525,6 @@ def render_combined_equity_chart(
                         )
                         frames.append(btc_frame)
                         series_order.append("BTC buy & hold")
-                        btc_caption = "BTC benchmark derived from logged market snapshots."
 
     combined_df = pd.concat(frames, ignore_index=True).dropna(subset=["timestamp", "Value"])
     combined_df.sort_values("timestamp", inplace=True)
@@ -598,27 +614,27 @@ def render_portfolio_tab(
         if not np.isfinite(realized_pnl):
             realized_pnl = 0.0
 
-    sharpe_ratio = compute_sharpe_ratio(trades_df)
+    sharpe_ratio = compute_sharpe_ratio(state_df, RISK_FREE_RATE)
     sortino_ratio = compute_sortino_ratio(state_df, RISK_FREE_RATE)
 
     col_a, col_b, col_c, col_d, col_e, col_f, col_g, col_h = st.columns(8)
-    col_a.metric("Total Equity", f"${latest['total_equity']:.2f}")
-    col_b.metric("Total Return %", f"{latest['total_return_pct']:.2f}%")
-    col_c.metric("Margin Allocated", f"${margin_allocated:.2f}")
-    col_d.metric("Available Balance", f"${latest['total_balance']:.2f}")
+    col_a.metric("Total Equity", f"${latest['total_equity']:,.2f}")
+    col_b.metric("Total Return %", f"{latest['total_return_pct']:,.2f}%")
+    col_c.metric("Margin Allocated", f"${margin_allocated:,.2f}")
+    col_d.metric("Available Balance", f"${latest['total_balance']:,.2f}")
     col_e.metric(
         "Unrealized PnL",
-        f"${unrealized_pnl:.2f}",
+        f"${unrealized_pnl:,.2f}",
         # delta=f"${unrealized_pnl - prev_unrealized:.2f}",
     )
-    col_f.metric("Realized PnL", f"${realized_pnl:.2f}")
+    col_f.metric("Realized PnL", f"${realized_pnl:,.2f}")
     col_g.metric(
         "Sharpe Ratio",
-        f"{sharpe_ratio:.2f}" if sharpe_ratio is not None else "N/A",
+        f"{sharpe_ratio:,.2f}" if sharpe_ratio is not None else "N/A",
     )
     col_h.metric(
         "Sortino Ratio",
-        f"{sortino_ratio:.2f}" if sortino_ratio is not None else "N/A",
+        f"{sortino_ratio:,.2f}" if sortino_ratio is not None else "N/A",
     )
 
     st.subheader("Equity Over Time (with BTC benchmark)")
@@ -668,7 +684,6 @@ def render_portfolio_tab(
                             }
                         )
                     )
-                    btc_caption = "BTC benchmark derived from logged market snapshots."
 
     equity_chart_df = pd.concat(chart_frames).dropna(subset=["timestamp", "Value"])
     equity_chart_df.sort_values("timestamp", inplace=True)

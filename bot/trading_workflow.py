@@ -592,6 +592,8 @@ Generate ONE punchy sentence summarizing your portfolio stance."""
         return None, None
 
 
+MIN_DATA_POINTS_FOR_SHARPE = int(60 / (config.CHECK_INTERVAL / 60))
+
 def calculate_sharpe_ratio(
     equity_values: Iterable[float],
     period_seconds: float,
@@ -627,7 +629,7 @@ def calculate_sharpe_ratio(
 
     # Filter out invalid returns
     log_returns = log_returns[np.isfinite(log_returns)]
-    if log_returns.size == 0:
+    if log_returns.size < max(2, MIN_DATA_POINTS_FOR_SHARPE - 1):
         return None
 
     period_seconds = (
@@ -652,15 +654,8 @@ def calculate_sharpe_ratio(
     if not np.isfinite(excess_return):
         return None
 
-    # Standard deviation of returns
-    return_std = np.std(
-        log_returns, ddof=1
-    )  # Use sample std (ddof=1) for better estimate
-
-    # Require minimum std threshold to avoid division by extremely small numbers
-    # This prevents unrealistic Sharpe ratios from tiny variations
-    MIN_STD_THRESHOLD = 1e-6  # 0.0001% minimum std
-    if return_std < MIN_STD_THRESHOLD:
+    return_std = np.std(log_returns, ddof=1)
+    if return_std <= 0 or not np.isfinite(return_std):
         return None
 
     # Calculate annualized Sharpe ratio
@@ -669,10 +664,6 @@ def calculate_sharpe_ratio(
 
     if not np.isfinite(sharpe):
         return None
-
-    # Cap Sharpe ratio at reasonable values (±10) to avoid extreme outliers
-    # Real-world Sharpe ratios rarely exceed ±5
-    sharpe = np.clip(sharpe, -10.0, 10.0)
 
     return float(sharpe)
 
