@@ -61,7 +61,7 @@ if ASSET_MODE.lower() == "crypto":
         "BNBUSDT": "BNB",
     }
 elif ASSET_MODE.lower() == "us_stock":
-    SYMBOLS = ["AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "NVDA"]
+    SYMBOLS = ["AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "NVDA", "IBIT", "TQQQ", "SQQQ", "UVIX"]
     SYMBOL_TO_COIN = {
         "AAPL": "AAPL",
         "MSFT": "MSFT",
@@ -69,6 +69,10 @@ elif ASSET_MODE.lower() == "us_stock":
         "AMZN": "AMZN",
         "TSLA": "TSLA",
         "NVDA": "NVDA",
+        "IBIT": "IBIT",
+        "TQQQ": "TQQQ",
+        "SQQQ": "SQQQ",
+        "UVIX": "UVIX",
     }
 INTERVAL = "3m"  # 3-minute candles
 CHECK_INTERVAL = 3 * 60  # Check every 3 minutes (when candle closes)
