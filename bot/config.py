@@ -37,13 +37,13 @@ LLM_MODELS = {
         "max_tokens": 4000,
         "temperature": 0.7,
     },
-    "gemini_pro": {
-        "model_id": "google/gemini-2.5-pro",
-        "name": "Gemini 2.5 Pro",
-        "provider": "Google",
-        "max_tokens": 4000,
-        "temperature": 0.7,
-    },
+    # "gemini_pro": {
+    #     "model_id": "google/gemini-2.5-pro",
+    #     "name": "Gemini 2.5 Pro",
+    #     "provider": "Google",
+    #     "max_tokens": 4000,
+    #     "temperature": 0.7,
+    # },
     "grok4": {
         "model_id": "x-ai/grok-4",
         "name": "Grok 4",
@@ -51,20 +51,20 @@ LLM_MODELS = {
         "max_tokens": 4000,
         "temperature": 0.7,
     },
-    "gpt5": {
-        "model_id": "openai/gpt-5",
-        "name": "GPT-5",
-        "provider": "OpenAI",
-        "max_tokens": 4000,
-        "temperature": 0.7,
-    },
-    "claude_sonnet_4.5": {
-        "model_id": "anthropic/claude-sonnet-4.5",
-        "name": "Claude Sonnet 4.5",
-        "provider": "Anthropic",
-        "max_tokens": 4000,
-        "temperature": 0.7,
-    },
+    # "gpt5": {
+    #     "model_id": "openai/gpt-5",
+    #     "name": "GPT-5",
+    #     "provider": "OpenAI",
+    #     "max_tokens": 4000,
+    #     "temperature": 0.7,
+    # },
+    # "claude_sonnet_4.5": {
+    #     "model_id": "anthropic/claude-sonnet-4.5",
+    #     "name": "Claude Sonnet 4.5",
+    #     "provider": "Anthropic",
+    #     "max_tokens": 4000,
+    #     "temperature": 0.7,
+    # },
 }
 # --- TELEGRAM NOTIFICATIONS ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

@@ -6,7 +6,9 @@ import logging
 import csv
 import json
 import re
+import threading
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -30,6 +32,13 @@ TRADES_CSV = config.DATA_DIR / "trade_history.csv"
 DECISIONS_CSV = config.DATA_DIR / "ai_decisions.csv"
 MESSAGES_CSV = config.DATA_DIR / "ai_messages.csv"
 
+_CSV_LOCKS = {
+    "state": threading.Lock(),
+    "trades": threading.Lock(),
+    "decisions": threading.Lock(),
+    "messages": threading.Lock(),
+}
+
 STATE_COLUMNS = [
     "timestamp",
     "total_balance",
@@ -45,11 +54,33 @@ STATE_COLUMNS = [
 ]
 
 
-def init_csv_files() -> None:
+def _ensure_model_directory(model_name: Optional[str]) -> Path:
+    """Ensure the base directory for the given model exists and return it."""
+    if not model_name:
+        config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        return config.DATA_DIR
+
+    model_dir = config.DATA_DIR / model_name
+    model_dir.mkdir(parents=True, exist_ok=True)
+    return model_dir
+
+
+def _resolve_csv_path(base_path: Path, model_name: Optional[str]) -> Path:
+    if not model_name:
+        base_path.parent.mkdir(parents=True, exist_ok=True)
+        return base_path
+
+    model_dir = _ensure_model_directory(model_name)
+    return model_dir / base_path.name
+
+
+def init_csv_files(model_name: Optional[str] = None) -> None:
     """Initialize CSV files with headers if they don't exist."""
     files_to_init = {
-        STATE_CSV: STATE_COLUMNS,
-        TRADES_CSV: [
+        STATE_CSV: ("state", STATE_COLUMNS),
+        TRADES_CSV: (
+            "trades",
+            [
             "timestamp",
             "coin",
             "action",
@@ -64,7 +95,10 @@ def init_csv_files() -> None:
             "balance_after",
             "reason",
         ],
-        DECISIONS_CSV: [
+        ),
+        DECISIONS_CSV: (
+            "decisions",
+            [
             "timestamp",
             "model",
             "coin",
@@ -72,23 +106,34 @@ def init_csv_files() -> None:
             "reasoning",
             "confidence",
         ],
-        MESSAGES_CSV: ["timestamp", "direction", "role", "content", "metadata"],
+        ),
+        MESSAGES_CSV: (
+            "messages",
+            ["timestamp", "direction", "role", "content", "metadata"],
+        ),
     }
-    for path, header in files_to_init.items():
-        if not path.exists():
-            with open(path, "w", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow(header)
+    for base_path, (lock_name, header) in files_to_init.items():
+        target_path = _resolve_csv_path(base_path, model_name)
+        lock = _CSV_LOCKS[lock_name]
+        with lock:
+            if not target_path.exists():
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(target_path, "w", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(header)
 
 
-def log_portfolio_state(state: Dict[str, Any]) -> None:
+def log_portfolio_state(state: Dict[str, Any], model_name: Optional[str] = None) -> None:
     """Log current portfolio state to CSV."""
-    with open(STATE_CSV, "a", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([state.get(col, "") for col in STATE_COLUMNS])
+    target_path = _resolve_csv_path(STATE_CSV, model_name)
+    with _CSV_LOCKS["state"]:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(target_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([state.get(col, "") for col in STATE_COLUMNS])
 
 
-def log_trade(trade_data: Dict[str, Any]) -> None:
+def log_trade(trade_data: Dict[str, Any], model_name: Optional[str] = None) -> None:
     """Log trade execution to CSV."""
     header = [
         "timestamp",
@@ -105,25 +150,34 @@ def log_trade(trade_data: Dict[str, Any]) -> None:
         "balance_after",
         "reason",
     ]
-    with open(TRADES_CSV, "a", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([trade_data.get(col, "") for col in header])
+    target_path = _resolve_csv_path(TRADES_CSV, model_name)
+    with _CSV_LOCKS["trades"]:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(target_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([trade_data.get(col, "") for col in header])
 
 
-def log_ai_decision(decision_data: Dict[str, Any]) -> None:
+def log_ai_decision(decision_data: Dict[str, Any], model_name: Optional[str] = None) -> None:
     """Log AI decision to CSV."""
     header = ["timestamp", "model", "coin", "signal", "reasoning", "confidence"]
-    with open(DECISIONS_CSV, "a", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([decision_data.get(col, "") for col in header])
+    target_path = _resolve_csv_path(DECISIONS_CSV, model_name)
+    with _CSV_LOCKS["decisions"]:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(target_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([decision_data.get(col, "") for col in header])
 
 
-def log_ai_message(message_data: Dict[str, Any]) -> None:
+def log_ai_message(message_data: Dict[str, Any], model_name: Optional[str] = None) -> None:
     """Log raw messages exchanged with the AI provider to CSV."""
     header = ["timestamp", "direction", "role", "content", "metadata"]
-    with open(MESSAGES_CSV, "a", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([message_data.get(col, "") for col in header])
+    target_path = _resolve_csv_path(MESSAGES_CSV, model_name)
+    with _CSV_LOCKS["messages"]:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(target_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([message_data.get(col, "") for col in header])
 
 
 # --- TELEGRAM ---
@@ -171,6 +225,7 @@ def format_trading_signal_message(
     total_equity: float = 0,
     total_return_pct: float = 0,
     net_unrealized_pnl: float = 0,
+    model_name: Optional[str] = None,
 ) -> str:
     """
     Format a trading signal message for Telegram with trade alerts, position updates, and summary.
@@ -190,7 +245,10 @@ def format_trading_signal_message(
     lines = []
     
     # Header
-    lines.append("🤖 <b>Trading Bot Update</b> 🤖")
+    header_title = "🤖 <b>Trading Bot Update</b> 🤖"
+    if model_name:
+        header_title += f"\nModel: <b>{model_name}</b>"
+    lines.append(header_title)
     lines.append("=" * 30)
     lines.append("")
     

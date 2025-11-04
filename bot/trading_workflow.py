@@ -4,8 +4,10 @@ Main trading workflow, state management, and execution logic.
 """
 import json
 import logging
+import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional, Iterable
 
 import numpy as np
@@ -18,65 +20,277 @@ from . import prompts_v1 as prompts
 from openai import OpenAI
 
 
+def _to_float(value: Any) -> Optional[float]:
+    """Convert value to float when possible, otherwise return None."""
+    if value is None:
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(result):
+        return None
+    return result
+
+
+def _to_serializable(value: Any) -> Any:
+    """Recursively convert numpy types so they can be JSON-serialized."""
+    if isinstance(value, dict):
+        return {key: _to_serializable(val) for key, val in value.items()}
+    if isinstance(value, list):
+        return [_to_serializable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_to_serializable(item) for item in value]
+    if isinstance(value, (np.floating, np.integer)):
+        return float(value)
+    return value
+
+
+class MarketDataCoordinator:
+    """Coordinates shared market data between concurrent trading loops."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._update_event = threading.Event()
+        self._market_snapshots: Dict[str, Dict[str, Any]] = {}
+        self._last_updated: Optional[datetime] = None
+        self._fetch_in_progress = False
+
+    def get_market_snapshots(self, wait_for_update: bool = True) -> Dict[str, Dict[str, Any]]:
+        if wait_for_update:
+            self._update_event.wait(timeout=config.CHECK_INTERVAL * 2)
+
+        with self._lock:
+            return {coin: snapshot.copy() for coin, snapshot in self._market_snapshots.items()}
+
+    def fetch_and_update(self) -> Dict[str, Dict[str, Any]]:
+        freshness_threshold = max(1, int(config.CHECK_INTERVAL * 0.1))
+        now = datetime.now(timezone.utc)
+
+        with self._lock:
+            if (
+                self._last_updated
+                and (now - self._last_updated).total_seconds() < freshness_threshold
+                and self._market_snapshots
+            ):
+                return {coin: snapshot.copy() for coin, snapshot in self._market_snapshots.items()}
+
+            if self._fetch_in_progress:
+                logging.debug("[MarketDataCoordinator] Fetch in progress; waiting for data...")
+                wait_event = self._update_event
+            else:
+                self._fetch_in_progress = True
+                self._update_event.clear()
+                wait_event = None
+
+        if wait_event is not None:
+            wait_event.wait(timeout=config.CHECK_INTERVAL * 2)
+            with self._lock:
+                return {coin: snapshot.copy() for coin, snapshot in self._market_snapshots.items()}
+
+        try:
+            logging.info("[MarketDataCoordinator] Fetching market data for all symbols...")
+            market_snapshots: Dict[str, Dict[str, Any]] = {}
+            for symbol in config.SYMBOLS:
+                snapshot = data_processing.collect_market_data(symbol)
+                if snapshot:
+                    market_snapshots[snapshot["coin"]] = snapshot
+
+            if len(market_snapshots) != len(config.SYMBOLS):
+                logging.warning("[MarketDataCoordinator] Incomplete market data snapshot fetched.")
+
+            with self._lock:
+                self._market_snapshots = market_snapshots
+                self._last_updated = datetime.now(timezone.utc)
+                self._update_event.set()
+
+            logging.info(
+                "[MarketDataCoordinator] Market data updated (%s coins) at %s",
+                len(market_snapshots),
+                self._last_updated,
+            )
+
+            return {coin: snapshot.copy() for coin, snapshot in market_snapshots.items()}
+
+        finally:
+            with self._lock:
+                self._fetch_in_progress = False
+
+
+_market_coordinator = MarketDataCoordinator()
+
+
 class TradingState:
     """Manages the full state of the trading bot."""
 
-    def __init__(self):
-        self.balance: float = config.START_CAPITAL
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+        self.initial_capital: float = getattr(config, "CAPITAL_PER_LLM", config.START_CAPITAL)
+        self.balance: float = self.initial_capital
         self.positions: Dict[str, Dict[str, Any]] = {}
         self.equity_history: list[float] = []
         self.start_time: datetime = datetime.now(timezone.utc)
         self.invocation_count: int = 0
         self.current_iteration_messages: list[str] = []
         self.current_iteration_trades: list[Dict[str, Any]] = []
+        self._state_dir: Path = config.DATA_DIR / self.model_name
+        self._state_dir.mkdir(parents=True, exist_ok=True)
+        self._state_file: Path = self._state_dir / "portfolio_state.json"
+        self._state_csv: Path = self._state_dir / "portfolio_state.csv"
 
     def load_state(self):
         """Load persisted balance and positions if available."""
-        if not utils.STATE_JSON.exists():
-            logging.info("No existing state file found; starting fresh.")
-            return
-        try:
-            with open(utils.STATE_JSON, "r") as f:
-                data = json.load(f)
-            self.balance = float(data.get("balance", config.START_CAPITAL))
-            
-            # Load positions if they exist
-            if "positions" in data and isinstance(data["positions"], dict):
-                self.positions = data["positions"]
-                logging.info(
-                    "Loaded state from %s (balance: %.2f, positions: %d)",
-                    utils.STATE_JSON,
-                    self.balance,
-                    len(self.positions)
+        data: Dict[str, Any] = {}
+
+        if self._state_file.exists():
+            try:
+                with open(self._state_file, "r") as f:
+                    data = json.load(f)
+            except Exception as e:
+                logging.error(
+                    "[%s] Failed to load state JSON (%s); attempting CSV fallback.",
+                    self.model_name,
+                    e,
+                    exc_info=True,
                 )
-                # Log each position for visibility
+
+        if data:
+            balance_candidate = data.get("last_total_balance", data.get("balance"))
+            balance_value = _to_float(balance_candidate) or self.initial_capital
+            self.balance = balance_value
+
+            positions = data.get("positions")
+            if isinstance(positions, dict):
+                self.positions = positions
+
+            last_equity = _to_float(data.get("last_total_equity"))
+            if last_equity is not None:
+                self.equity_history.append(last_equity)
+
+            logging.info(
+                "[%s] Loaded state from %s (balance: %.2f, positions: %d)",
+                self.model_name,
+                self._state_file,
+                self.balance,
+                len(self.positions),
+            )
+
+            if self.positions:
                 for coin, pos in self.positions.items():
                     logging.info(
-                        "  Restored position: %s %s @ $%.4f (qty: %.4f, leverage: %dx)",
+                        "[%s]   Restored position: %s %s @ $%.4f (qty: %.4f, leverage: %dx)",
+                        self.model_name,
                         coin,
                         pos.get("side", "").upper(),
                         pos.get("entry_price", 0),
                         pos.get("quantity", 0),
-                        pos.get("leverage", 1)
+                        pos.get("leverage", 1),
                     )
-            else:
-                logging.info(
-                    "Loaded state from %s (balance: %.2f, no positions)", 
-                    utils.STATE_JSON, 
-                    self.balance
-                )
-        except Exception as e:
-            logging.error("Failed to load state: %s", e, exc_info=True)
+            return
 
-    def save_state(self):
-        """Persist current balance and open positions."""
+        self._load_state_from_csv()
+
+    def _load_state_from_csv(self):
+        """Fallback loader that restores state from the latest CSV snapshot."""
+        if not self._state_csv.exists():
+            logging.info("[%s] No existing state file found; starting fresh.", self.model_name)
+            return
+
         try:
-            with open(utils.STATE_JSON, "w") as f:
-                json.dump(
-                    {"balance": self.balance, "positions": self.positions}, f, indent=2
-                )
+            df = pd.read_csv(self._state_csv)
         except Exception as e:
-            logging.error("Failed to save state: %s", e, exc_info=True)
+            logging.error(
+                "[%s] Failed to read state CSV %s: %s",
+                self.model_name,
+                self._state_csv,
+                e,
+                exc_info=True,
+            )
+            return
+
+        if df.empty:
+            logging.info(
+                "[%s] State CSV %s is empty; starting fresh.",
+                self.model_name,
+                self._state_csv,
+            )
+            return
+
+        latest = df.iloc[-1]
+
+        balance_value = _to_float(latest.get("total_balance"))
+        if balance_value is not None:
+            self.balance = balance_value
+
+        equity_value = _to_float(latest.get("total_equity"))
+        if equity_value is not None:
+            self.equity_history.append(equity_value)
+
+        positions_raw = latest.get("position_details")
+        positions_loaded = 0
+        if isinstance(positions_raw, str) and positions_raw.strip():
+            try:
+                self.positions = json.loads(positions_raw)
+                positions_loaded = len(self.positions)
+            except json.JSONDecodeError as e:
+                logging.error(
+                    "[%s] Failed to decode position details from CSV: %s",
+                    self.model_name,
+                    e,
+                    exc_info=True,
+                )
+
+        logging.info(
+            "[%s] Restored state from CSV %s (balance: %.2f, positions: %d)",
+            self.model_name,
+            self._state_csv,
+            self.balance,
+            positions_loaded,
+        )
+
+        if self.positions:
+            for coin, pos in self.positions.items():
+                logging.info(
+                    "[%s]   Restored position: %s %s @ $%.4f (qty: %.4f, leverage: %dx)",
+                    self.model_name,
+                    coin,
+                    pos.get("side", "").upper(),
+                    pos.get("entry_price", 0),
+                    pos.get("quantity", 0),
+                    pos.get("leverage", 1),
+                )
+
+    def save_state(self, latest_summary: Optional[Dict[str, Any]] = None):
+        """Persist current balance, equity, and open positions."""
+        payload: Dict[str, Any] = {
+            "balance": _to_float(self.balance) or self.balance,
+            "positions": _to_serializable(self.positions),
+            "initial_capital": _to_float(self.initial_capital) or self.initial_capital,
+            "start_time": self.start_time.isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if latest_summary:
+            total_balance = _to_float(latest_summary.get("total_balance"))
+            total_equity = _to_float(latest_summary.get("total_equity"))
+            total_margin = _to_float(latest_summary.get("total_margin"))
+            total_return_pct = _to_float(latest_summary.get("total_return_pct"))
+
+            if total_balance is not None:
+                payload["last_total_balance"] = total_balance
+            if total_equity is not None:
+                payload["last_total_equity"] = total_equity
+            if total_margin is not None:
+                payload["last_total_margin"] = total_margin
+            if total_return_pct is not None:
+                payload["last_total_return_pct"] = total_return_pct
+
+        try:
+            self._state_dir.mkdir(parents=True, exist_ok=True)
+            with open(self._state_file, "w") as f:
+                json.dump(payload, f, indent=2)
+        except Exception as e:
+            logging.error("[%s] Failed to save state: %s", self.model_name, e, exc_info=True)
 
     def calculate_unrealized_pnl(self, coin: str, current_price: float) -> float:
         pos = self.positions[coin]
@@ -98,7 +312,7 @@ class TradingState:
             total_equity += unrealized_pnl
 
         total_return_pct = (
-            (total_equity - config.START_CAPITAL) / config.START_CAPITAL
+            (total_equity - self.initial_capital) / self.initial_capital
         ) * 100
         net_unrealized_pnl = total_equity - self.balance - total_margin
 
@@ -156,7 +370,8 @@ def get_llm_decisions(
                 "role": "system",
                 "content": prompts.TRADING_RULES_PROMPT,
                 "metadata": {"model": model_name},
-            }
+            },
+            model_name=model_name,
         )
         utils.log_ai_message(
             {
@@ -165,7 +380,8 @@ def get_llm_decisions(
                 "role": "user",
                 "content": prompt,
                 "metadata": {"model": model_name},
-            }
+            },
+            model_name=model_name,
         )
         model_config = config.LLM_MODELS[model_name]
 
@@ -187,7 +403,8 @@ def get_llm_decisions(
                 "role": "assistant",
                 "content": content,
                 "metadata": {"id": response.id},
-            }
+            },
+            model_name=model_name,
         )
 
         if not content:
@@ -473,7 +690,7 @@ def execute_trade(
     if signal == "entry":
         # valid no existing position
         if coin in state.positions:
-            logging.warning(f"Already have position for {coin}, skipping entry")
+            logging.warning("[%s] Already have position for %s, skipping entry", state.model_name, coin)
             return
 
         # extract decision parameters
@@ -486,7 +703,7 @@ def execute_trade(
         # Calculate position size based on risk
         stop_distance = abs(price - stop_loss)
         if stop_distance == 0:
-            logging.warning(f"{coin}: Invalid stop loss, skipping")
+            logging.warning("[%s] %s: Invalid stop loss, skipping", state.model_name, coin)
             return
 
         position_value = quantity * price
@@ -494,7 +711,7 @@ def execute_trade(
 
         # Check sufficient balance
         if margin_required > state.balance:
-            logging.warning(f"{coin}: Insufficient balance for margin")
+            logging.warning("[%s] %s: Insufficient balance for margin", state.model_name, coin)
             return
 
         # Create position
@@ -516,7 +733,14 @@ def execute_trade(
 
         # Update balance
         state.balance -= margin_required
-        logging.info(f"ENTRY: {coin} {side.upper()} {quantity:.4f} @ ${price:.4f}")
+        logging.info(
+            "[%s] ENTRY: %s %s %.4f @ $%.4f",
+            state.model_name,
+            coin,
+            side.upper(),
+            quantity,
+            price,
+        )
         
         trade_data = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -534,12 +758,12 @@ def execute_trade(
             "reason": decision.get("justification", "AI entry signal"),
         }
         
-        utils.log_trade(trade_data)
+        utils.log_trade(trade_data, model_name=state.model_name)
         state.current_iteration_trades.append(trade_data)
 
     elif signal == "close":
         if coin not in state.positions:
-            logging.warning(f"{coin}: No position to close")
+            logging.warning("[%s] %s: No position to close", state.model_name, coin)
             return
 
         pos = state.positions[coin]
@@ -549,7 +773,12 @@ def execute_trade(
         state.balance += pos["margin"] + pnl
 
         logging.info(
-            f"CLOSE: {coin} {pos['side'].upper()} @ ${price:.4f} | PnL: ${pnl:.2f}"
+            "[%s] CLOSE: %s %s @ $%.4f | PnL: $%.2f",
+            state.model_name,
+            coin,
+            pos["side"].upper(),
+            price,
+            pnl,
         )
 
         trade_data = {
@@ -568,7 +797,7 @@ def execute_trade(
             "reason": decision.get("justification", "AI close signal"),
         }
         
-        utils.log_trade(trade_data)
+        utils.log_trade(trade_data, model_name=state.model_name)
         state.current_iteration_trades.append(trade_data)
         
         # Remove position
@@ -578,18 +807,18 @@ def execute_trade(
 def run_trading_loop(model_name: str):
     """The main event loop for the trading bot."""
     utils.setup_logging()
-    utils.init_csv_files()
+    utils.init_csv_files(model_name=model_name)
 
-    state = TradingState()
+    state = TradingState(model_name)
     state.load_state()
 
-    logging.info("Initializing clients...")
+    logging.info("[%s] Initializing clients...", model_name)
     if not clients.get_binance_client() or not clients.get_llm_client():
-        logging.critical("Failed to initialize required API clients. Exiting.")
+        logging.critical("[%s] Failed to initialize required API clients. Exiting.", model_name)
         return
 
-    logging.info(f"Starting capital: ${config.START_CAPITAL:.2f}")
-    logging.info(f"Monitoring: {list(config.SYMBOL_TO_COIN.values())}")
+    logging.info("[%s] Starting capital: $%.2f", model_name, state.initial_capital)
+    logging.info("[%s] Monitoring: %s", model_name, list(config.SYMBOL_TO_COIN.values()))
 
     while True:
         try:
@@ -597,26 +826,22 @@ def run_trading_loop(model_name: str):
             state.current_iteration_messages = []
             state.current_iteration_trades = []  # Reset trades for this iteration
 
-            header = f"\n{Fore.CYAN}{'='*20} Iteration {state.invocation_count} - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} {'='*20}{Style.RESET_ALL}"
+            header = f"\n{Fore.CYAN}[{model_name}] {'='*20} Iteration {state.invocation_count} - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} {'='*20}{Style.RESET_ALL}"
             print(header)
             state.current_iteration_messages.append(utils.strip_ansi_codes(header))
 
-            # 1. Fetch market data
-            logging.info("Fetching market data for all symbols...")
-            market_snapshots = {}
-            for symbol in config.SYMBOLS:
-                snapshot = data_processing.collect_market_data(symbol)
-                if snapshot:
-                    market_snapshots[snapshot["coin"]] = snapshot
+            # 1. Fetch shared market data snapshot
+            market_snapshots = _market_coordinator.fetch_and_update()
+            if not market_snapshots:
+                logging.warning("[%s] No market data available; skipping iteration.", model_name)
+                time.sleep(config.CHECK_INTERVAL)
+                continue
 
-            if len(market_snapshots) != len(config.SYMBOLS):
-                logging.warning("Failed to fetch market data for one or more symbols.")
-
-            logging.info("Checking stop loss / take profit...")
+            logging.info("[%s] Checking stop loss / take profit...", model_name)
             check_stop_loss_take_profit(state, market_snapshots)
 
             # 2. Get LLM decisions
-            logging.info("Requesting trading decisions from LLM...")
+            logging.info("[%s] Requesting trading decisions from LLM...", model_name)
             decisions = get_llm_decisions(state, market_snapshots, model_name)
 
             # 3. Execute trades
@@ -628,9 +853,11 @@ def run_trading_loop(model_name: str):
                     utils.log_ai_decision(
                         {
                             "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "model": model_name,
                             "coin": coin,
                             **decision,
-                        }
+                        },
+                        model_name=model_name,
                     )
 
                     current_price = market_snapshots.get(coin, {}).get("price")
@@ -657,7 +884,7 @@ def run_trading_loop(model_name: str):
                                 "confidence", pos.get("confidence", 0.5)
                             )
             else:
-                logging.warning("No decisions received from LLM.")
+                logging.warning("[%s] No decisions received from LLM.", model_name)
 
             # 4. Log and display summary
             summary = state.get_summary(market_snapshots)
@@ -672,7 +899,7 @@ def run_trading_loop(model_name: str):
                 print(summary_header)
                 print(f"{Fore.WHITE}{professional_summary}{Style.RESET_ALL}")
                 print(f"{Fore.GREEN}{'='*63}{Style.RESET_ALL}\n")
-                logging.info(f"Portfolio Summary: {professional_summary}")
+                logging.info("[%s] Portfolio Summary: %s", model_name, professional_summary)
 
                 # Add summaries to the state dict before logging
                 summary["portfolio_summary"] = professional_summary
@@ -684,13 +911,14 @@ def run_trading_loop(model_name: str):
                 print(short_header)
                 print(f"{Fore.YELLOW}💰 {short_summary}{Style.RESET_ALL}")
                 print(f"{Fore.CYAN}{'='*63}{Style.RESET_ALL}\n")
-                logging.info(f"Short Summary: {short_summary}")
+                logging.info("[%s] Short Summary: %s", model_name, short_summary)
 
                 summary["short_summary"] = short_summary
             else:
                 summary["short_summary"] = ""
 
-            utils.log_portfolio_state(summary)
+            utils.log_portfolio_state(summary, model_name=model_name)
+            state.save_state(latest_summary=summary)
 
             # 5. Send Telegram notification
             if config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_ID:
@@ -703,21 +931,22 @@ def run_trading_loop(model_name: str):
                         total_equity=summary["total_equity"],
                         total_return_pct=summary["total_return_pct"],
                         net_unrealized_pnl=summary["net_unrealized_pnl"],
+                        model_name=model_name,
                     )
                     utils.send_telegram_message(telegram_message, parse_mode="HTML")
-                    logging.info("Telegram notification sent successfully")
+                    logging.info("[%s] Telegram notification sent successfully", model_name)
                 except Exception as e:
-                    logging.error(f"Failed to send Telegram notification: {e}", exc_info=True)
+                    logging.error("[%s] Failed to send Telegram notification: %s", model_name, e, exc_info=True)
 
             # 6. Wait for next interval
-            logging.info(f"Waiting {config.CHECK_INTERVAL} seconds...")
+            logging.info("[%s] Waiting %d seconds...", model_name, config.CHECK_INTERVAL)
             time.sleep(config.CHECK_INTERVAL)
 
         except KeyboardInterrupt:
-            logging.info("Shutdown signal received.")
+            logging.info("[%s] Shutdown signal received.", model_name)
             state.save_state()
             break
         except Exception as e:
-            logging.error(f"Error in main loop: {e}", exc_info=True)
+            logging.error("[%s] Error in main loop: %s", model_name, e, exc_info=True)
             state.save_state()
             time.sleep(60)
