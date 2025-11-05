@@ -147,6 +147,7 @@ def get_portfolio_state(csv_path: str) -> pd.DataFrame:
         "num_positions",
         "total_margin",
         "net_unrealized_pnl",
+        "sharpe_ratio",
     ]
     for col in numeric_cols:
         if col in df.columns:
@@ -614,7 +615,13 @@ def render_portfolio_tab(
         if not np.isfinite(realized_pnl):
             realized_pnl = 0.0
 
-    sharpe_ratio = compute_sharpe_ratio(state_df, RISK_FREE_RATE)
+    sharpe_ratio = None
+    if "sharpe_ratio" in state_df.columns:
+        sharpe_series = pd.to_numeric(state_df["sharpe_ratio"], errors="coerce")
+        sharpe_series = sharpe_series.dropna()
+        if not sharpe_series.empty:
+            sharpe_ratio = float(sharpe_series.iloc[-1])
+            
     sortino_ratio = compute_sortino_ratio(state_df, RISK_FREE_RATE)
 
     col_a, col_b, col_c, col_d, col_e, col_f, col_g, col_h = st.columns(8)
