@@ -8,6 +8,7 @@ import os
 import re
 from pathlib import Path
 from typing import Dict, List, Any, Iterable
+from html import escape
 
 import altair as alt
 import numpy as np
@@ -339,6 +340,35 @@ def parse_positions(position_payload: Any) -> pd.DataFrame:
     return df
 
 
+def prepare_summary_html(text: Any) -> str | None:
+    """Convert plain-text summary content into safe HTML paragraphs."""
+    if isinstance(text, float) and pd.isna(text):
+        return None
+    if text is None:
+        return None
+
+    normalized = str(text).replace("\r\n", "\n").strip()
+    if not normalized:
+        return None
+
+    paragraphs = [para.strip() for para in normalized.split("\n\n") if para.strip()]
+    if not paragraphs:
+        paragraphs = [normalized]
+
+    html_parts: List[str] = []
+    for para in paragraphs:
+        lines = [line.strip() for line in para.split("\n")]
+        escaped_lines = [escape(line, quote=False) for line in lines if line]
+        if not escaped_lines:
+            continue
+        html_parts.append("<p>" + "<br>".join(escaped_lines) + "</p>")
+
+    if not html_parts:
+        return None
+
+    return "".join(html_parts)
+
+
 def fetch_current_prices(coins: List[str]) -> Dict[str, float | None]:
     """Fetch latest market prices for the provided coin tickers."""
     prices: Dict[str, float | None] = {coin: None for coin in coins}
@@ -643,6 +673,31 @@ def render_portfolio_tab(
         "Sortino Ratio",
         f"{sortino_ratio:,.2f}" if sortino_ratio is not None else "N/A",
     )
+
+    portfolio_summary = latest.get("portfolio_summary")
+    short_summary_text = latest.get("short_summary")
+
+    portfolio_summary_html = prepare_summary_html(portfolio_summary)
+    short_summary_html = prepare_summary_html(short_summary_text)
+
+    if portfolio_summary_html or short_summary_html:
+        col_summary_a, col_summary_b = st.columns(2)
+
+        if portfolio_summary_html:
+            with col_summary_a:
+                st.markdown("**Portfolio Summary**")
+                st.markdown(
+                    f"<div style='white-space:normal; line-height:1.55'>{portfolio_summary_html}</div>",
+                    unsafe_allow_html=True,
+                )
+
+        if short_summary_html:
+            with col_summary_b:
+                st.markdown("**Quick Take**")
+                st.markdown(
+                    f"<div style='white-space:normal; line-height:1.55'>{short_summary_html}</div>",
+                    unsafe_allow_html=True,
+                )
 
     st.subheader("Equity Over Time (with BTC benchmark)")
     base_investment = STARTING_CAPITAL

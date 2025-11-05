@@ -164,7 +164,9 @@ class TradingState:
                 self.positions = positions
 
             last_equity = _to_float(data.get("last_total_equity"))
-            if last_equity is not None:
+
+            history_loaded = self._hydrate_equity_history()
+            if not history_loaded and last_equity is not None:
                 self.equity_history.append(last_equity)
 
             logging.info(
@@ -223,8 +225,6 @@ class TradingState:
             self.balance = balance_value
 
         equity_value = _to_float(latest.get("total_equity"))
-        if equity_value is not None:
-            self.equity_history.append(equity_value)
 
         positions_raw = latest.get("position_details")
         positions_loaded = 0
@@ -239,6 +239,10 @@ class TradingState:
                     e,
                     exc_info=True,
                 )
+
+        history_loaded = self._hydrate_equity_history(df)
+        if not history_loaded and equity_value is not None:
+            self.equity_history.append(equity_value)
 
         logging.info(
             "[%s] Restored state from CSV %s (balance: %.2f, positions: %d)",
@@ -259,6 +263,33 @@ class TradingState:
                     pos.get("quantity", 0),
                     pos.get("leverage", 1),
                 )
+
+    def _hydrate_equity_history(self, df: Optional[pd.DataFrame] = None) -> bool:
+        """Populate equity history from CSV data for Sharpe calculations."""
+        try:
+            if df is None:
+                if not self._state_csv.exists():
+                    return False
+                df = pd.read_csv(self._state_csv, usecols=["total_equity"])
+        except Exception as e:
+            logging.error(
+                "[%s] Failed to load equity history from %s: %s",
+                self.model_name,
+                self._state_csv,
+                e,
+                exc_info=True,
+            )
+            return False
+
+        if "total_equity" not in df.columns:
+            return False
+
+        series = pd.to_numeric(df["total_equity"], errors="coerce").dropna()
+        if series.empty:
+            return False
+
+        self.equity_history = series.tolist()
+        return True
 
     def save_state(self, latest_summary: Optional[Dict[str, Any]] = None):
         """Persist current balance, equity, and open positions."""
