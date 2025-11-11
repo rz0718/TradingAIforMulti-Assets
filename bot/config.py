@@ -9,6 +9,11 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# MONGO DB
+MONGO_DB_PATH = os.getenv("MONGO_DB_PATH", "")
+MONGO_DB_USERNAME = os.getenv("MONGO_DB_USERNAME", "")
+MONGO_DB_PASSWORD = os.getenv("MONGO_DB_PASSWORD", "")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "")
 
 ASSET_MODE = os.getenv("ASSET_MODE", "crypto")
 
@@ -59,6 +64,13 @@ if ASSET_MODE.lower() == "crypto":
         "BTCUSDT": "BTC",
         "DOGEUSDT": "DOGE",
         "BNBUSDT": "BNB",
+    }
+elif ASSET_MODE.lower() == "idss":
+    SYMBOLS = ["BBCA", "GOTO", "BYAN"]
+    SYMBOL_TO_COIN = {
+        "BBCA": "BBCA",
+        "GOTO": "GOTO",
+        "BYAN": "BYAN",
     }
 elif ASSET_MODE.lower() == "us_stock":
     SYMBOLS = ["AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "NVDA", "IBIT", "TQQQ", "SQQQ", "UVIX"]
