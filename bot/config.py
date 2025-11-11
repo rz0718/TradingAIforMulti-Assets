@@ -96,7 +96,7 @@ elif ASSET_MODE.lower() == "us_stock":
     }
 INTERVAL = "3m"  # 3-minute candles
 CHECK_INTERVAL = 3 * 60  # Check every 3 minutes (when candle closes)
-START_CAPITAL = 10000.0
+START_CAPITAL = 100000000 # 100000000 idr is 6k USD
 CAPITAL_PER_LLM = START_CAPITAL  # $10,000 per LLM (2 models total)
 
 # --- INDICATOR SETTINGS ---
