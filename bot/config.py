@@ -66,11 +66,19 @@ if ASSET_MODE.lower() == "crypto":
         "BNBUSDT": "BNB",
     }
 elif ASSET_MODE.lower() == "idss":
-    SYMBOLS = ["BBCA", "GOTO", "BYAN"]
+    SYMBOLS = ["BBCA", "GOTO", "BYAN", "BYAN", "BMRI", "BBRI", "TLKM", "ASII", "TPIA", "BBNI", "UNVR", "HMSP"]
     SYMBOL_TO_COIN = {
         "BBCA": "BBCA",
         "GOTO": "GOTO",
         "BYAN": "BYAN",
+        "BMRI": "BMRI",
+        "BBRI": "BBRI",
+        "TLKM": "TLKM",
+        "ASII": "ASII",
+        "TPIA": "TPIA",
+        "BBNI": "BBNI",
+        "UNVR": "UNVR",
+        "HMSP": "HMSP",
     }
 elif ASSET_MODE.lower() == "us_stock":
     SYMBOLS = ["AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "NVDA", "IBIT", "TQQQ", "SQQQ", "UVIX"]
