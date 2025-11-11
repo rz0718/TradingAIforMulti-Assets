@@ -66,7 +66,7 @@ if ASSET_MODE.lower() == "crypto":
         "BNBUSDT": "BNB",
     }
 elif ASSET_MODE.lower() == "idss":
-    SYMBOLS = ["BBCA", "GOTO", "BYAN", "BYAN", "BMRI", "BBRI", "TLKM", "ASII", "TPIA", "BBNI", "UNVR", "HMSP"]
+    SYMBOLS = ["BBCA", "GOTO", "BYAN", "BMRI", "BBRI", "TLKM", "ASII", "TPIA", "BBNI", "UNVR", "HMSP"]
     SYMBOL_TO_COIN = {
         "BBCA": "BBCA",
         "GOTO": "GOTO",
