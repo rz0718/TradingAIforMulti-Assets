@@ -680,10 +680,12 @@ def run_trading_loop(model_name: str):
                 if not is_market_open():
                     et_tz = ZoneInfo("America/New_York")
                     current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
-                    logging.info(f"Market is now closed (current time: {current_time}). Saving state and exiting...")
+                    logging.info(f"Market is now closed (current time: {current_time}). Waiting for market to open...")
                     state.save_state()
-                    logging.info("Bot will need to be restarted when market opens.")
-                    break
+                    state.invocation_count = 0  # Reset iteration count
+                    logging.info("Sleeping for 1 minute before checking market status again...")
+                    time.sleep(60)  # Sleep for 1 minute
+                    continue  # Skip this iteration and retry
             
             if config.ASSET_MODE.lower() == "idss":
                 # Check if it's break time (12:00 - 13:30 WIB)
@@ -698,10 +700,12 @@ def run_trading_loop(model_name: str):
                 if not is_market_open():
                     wib_tz = ZoneInfo("Asia/Jakarta")
                     current_time = datetime.now(wib_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
-                    logging.info(f"IDX market is now closed (current time: {current_time}). Saving state and exiting...")
+                    logging.info(f"IDX market is now closed (current time: {current_time}). Waiting for market to open...")
                     state.save_state()
-                    logging.info("Bot will need to be restarted when market opens.")
-                    break
+                    state.invocation_count = 0  # Reset iteration count
+                    logging.info("Sleeping for 1 minute before checking market status again...")
+                    time.sleep(60)  # Sleep for 1 minute
+                    continue  # Skip this iteration and retry
 
 
             state.invocation_count += 1

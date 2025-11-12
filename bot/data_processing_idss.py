@@ -69,12 +69,12 @@ def mongo_data_to_dataframe(mongo_data: List[Dict[str, Any]]) -> pd.DataFrame:
     
     # Rename columns to standard format
     column_mapping = {
-        "o": "open",
-        "h": "high",
-        "l": "low",
-        "c": "close",
-        "v": "volume",
-        "psd": "timestamp"
+        "op": "open",
+        "hip": "high",
+        "lop": "low",
+        "clp": "close",
+        "vol": "volume",
+        "cst": "timestamp"
     }
     
     df = df.rename(columns=column_mapping)
