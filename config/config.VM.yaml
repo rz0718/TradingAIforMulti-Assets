@@ -1,6 +1,6 @@
 mongo:
   secretName: STAGING_IDSS_MONGO_CONFIG
-  appName:mongo-staging-jakarta-v7-pluang
+  appName: mongo-staging-jakarta-v7-pluang
 kafka:
   consumer:
     topic:

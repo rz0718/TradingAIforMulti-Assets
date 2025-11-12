@@ -65,28 +65,38 @@ else:
 envConfigFilePath = f"config/config.{env}.yaml"
 envCONFIG = yaml_parser(envConfigFilePath)
 
+from utils.awsUtils import AWS
+aws = AWS(env=env, configFilePath=f"config/config.{env}.yaml")
+
 # MONGO DB
-MONGO_DB_PATH = os.getenv("MONGO_DB_PATH", "")
-MONGO_DB_USERNAME = os.getenv("MONGO_DB_USERNAME", "")
-MONGO_DB_PASSWORD = os.getenv("MONGO_DB_PASSWORD", "")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "")
+MONGO_DB_CONFIG = aws.get_aws_secret_manager_value(
+    key=envCONFIG['mongo']['secretName']
+)
+MONGO_DB_HOST = MONGO_DB_CONFIG.get("DATABASES_PLUANG_MONGO_HOST")
+MONGO_DB_USERNAME = MONGO_DB_CONFIG.get("DATABASES_PLUANG_MONGO_USER")
+MONGO_DB_PASSWORD = MONGO_DB_CONFIG.get("DATABASES_PLUANG_MONGO_PASSWORD")
+MONGO_APP_NAME = envCONFIG['mongo']["appName"]
+
 
 ASSET_MODE = os.getenv("ASSET_MODE", "idss")
 
+AI_TRADING_BOT_CONFIG = aws.get_aws_secret_manager_value(key=envCONFIG['tradingBotSecretName'])
+
 # --- BINANCE API CONFIGURATION ---
-BN_API_KEY = os.getenv("BN_API_KEY", "")
-BN_SECRET = os.getenv("BN_SECRET", "")
+BN_API_KEY = AI_TRADING_BOT_CONFIG.get("BN_API_KEY", "")
+BN_SECRET = AI_TRADING_BOT_CONFIG.get("BN_SECRET", "")
 
 # --- OPENROUTER MULTI-LLM CONFIGURATION ---
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_API_KEY = AI_TRADING_BOT_CONFIG.get("OPENROUTER_API_KEY", "")
+
 
 # --- ALPACA API CONFIGURATION ---
-ALPACA_API_KEY = os.getenv("ALPACA_API_KEY", "")
-ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
+ALPACA_API_KEY = AI_TRADING_BOT_CONFIG.get("ALPACA_API_KEY", "")
+ALPACA_SECRET_KEY = AI_TRADING_BOT_CONFIG.get("ALPACA_SECRET_KEY", "")
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_BOT_TOKEN = AI_TRADING_BOT_CONFIG.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = AI_TRADING_BOT_CONFIG.get("TELEGRAM_CHAT_ID", "")
 
 if ASSET_MODE.lower() == "crypto":
     # --- TRADING PARAMETERS ---
