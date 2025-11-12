@@ -48,7 +48,7 @@ def main():
         [sys.executable, "-u", "main.py"],
         stdout=sys.stdout,
         stderr=sys.stderr,
-        cwd="/app"
+        cwd="/workspace"
     )
     processes.append(bot_process)
     print(f"✅ Trading Bot started (PID: {bot_process.pid})", flush=True)
@@ -69,7 +69,7 @@ def main():
         ],
         stdout=sys.stdout,
         stderr=sys.stderr,
-        cwd="/app/front_end"
+        cwd="/workspace/front_end"
     )
     processes.append(dashboard_process)
     print(f"✅ Dashboard started (PID: {dashboard_process.pid})", flush=True)
