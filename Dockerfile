@@ -1,5 +1,5 @@
-# Use official Python 3.13.3 image (supports both AMD64 and ARM64)
-FROM python:3.13.3-slim
+ARG PRIVATE_AWS_ECR_URL
+FROM ${PRIVATE_AWS_ECR_URL}/pluangpython:3.9-v2
 
 WORKDIR /workspace
 
