@@ -13,10 +13,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN mkdir -p /app/data
 VOLUME ["/app/data"]
 
-# Install system dependencies (optional, only if needed for compilation)
+# Install system dependencies (including bash for the startup script)
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    bash \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
@@ -31,5 +32,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy your application code
 COPY . .
 
-# Run your application
-CMD ["python", "bot.py"]
+# Make startup script executable
+RUN chmod +x start.sh
+
+# Expose Streamlit port
+EXPOSE 8501
+
+# Run both trading bot and dashboard
+CMD ["./start.sh"]
