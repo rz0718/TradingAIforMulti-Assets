@@ -9,21 +9,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TRADEBOT_DATA_DIR=/workspace/data
 
     
-# Install system dependencies (including bash for the startup script)
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    bash \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update
+RUN apt-get install -y libpq-dev
 
 # Copy requirements file
 COPY . .
 
-# Upgrade pip
-RUN pip install --upgrade pip
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --upgrade pip
+RUN pip install -r requirements.txt
 
 
 # Make startup scripts executable
