@@ -22,7 +22,7 @@ def test_openrouter_connection():
     print(f"✅ Found API key (length: {len(api_key)})")
 
     # Initialize OpenRouter client
-    client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+    client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1", max_retries=0)
 
     # Test models
     models_to_test = ["anthropic/claude-sonnet-4.5", "google/gemini-2.5-pro"]

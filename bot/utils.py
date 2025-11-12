@@ -49,6 +49,7 @@ STATE_COLUMNS = [
     "total_margin",
     "net_unrealized_pnl",
     "sharpe_ratio",
+    "total_fees_paid",
     "portfolio_summary",
     "short_summary",
 ]
@@ -92,8 +93,12 @@ def init_csv_files(model_name: Optional[str] = None) -> None:
             "leverage",
             "confidence",
             "pnl",
+            "net_pnl",
+            "fee",
             "balance_after",
             "reason",
+            "position_fee_total",
+            "position_net_pnl",
         ],
         ),
         DECISIONS_CSV: (
@@ -121,6 +126,34 @@ def init_csv_files(model_name: Optional[str] = None) -> None:
                 with open(target_path, "w", newline="") as f:
                     writer = csv.writer(f)
                     writer.writerow(header)
+                continue
+
+            # Ensure existing files have the expected header (handle upgrades)
+            try:
+                with open(target_path, "r", newline="") as f:
+                    reader = csv.reader(f)
+                    existing_header = next(reader, [])
+                    remaining_rows = list(reader)
+            except Exception as exc:
+                logging.warning(
+                    "Failed to read CSV header for %s (%s); rewriting with new header.",
+                    target_path,
+                    exc,
+                )
+                existing_header = []
+                remaining_rows = []
+
+            if existing_header != header:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(target_path, "w", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(header)
+                    for row in remaining_rows:
+                        row_dict = {
+                            existing_header[idx]: row[idx]
+                            for idx in range(min(len(row), len(existing_header)))
+                        }
+                        writer.writerow([row_dict.get(col, "") for col in header])
 
 
 def log_portfolio_state(state: Dict[str, Any], model_name: Optional[str] = None) -> None:
@@ -147,8 +180,12 @@ def log_trade(trade_data: Dict[str, Any], model_name: Optional[str] = None) -> N
         "leverage",
         "confidence",
         "pnl",
+        "net_pnl",
+        "fee",
         "balance_after",
         "reason",
+        "position_fee_total",
+        "position_net_pnl",
     ]
     target_path = _resolve_csv_path(TRADES_CSV, model_name)
     with _CSV_LOCKS["trades"]:
@@ -161,6 +198,14 @@ def log_trade(trade_data: Dict[str, Any], model_name: Optional[str] = None) -> N
 def log_ai_decision(decision_data: Dict[str, Any], model_name: Optional[str] = None) -> None:
     """Log AI decision to CSV."""
     header = ["timestamp", "model", "coin", "signal", "reasoning", "confidence"]
+    # Support newer decision payloads that provide `justification` instead of `reasoning`
+    if "reasoning" not in decision_data or not decision_data.get("reasoning"):
+        if "justification" in decision_data:
+            reasoning_value = decision_data.get("justification")
+            decision_data = {
+                **decision_data,
+                "reasoning": reasoning_value if reasoning_value is not None else "",
+            }
     target_path = _resolve_csv_path(DECISIONS_CSV, model_name)
     with _CSV_LOCKS["decisions"]:
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -225,6 +270,7 @@ def format_trading_signal_message(
     total_equity: float = 0,
     total_return_pct: float = 0,
     net_unrealized_pnl: float = 0,
+    total_fees_paid: float = 0,
     model_name: Optional[str] = None,
 ) -> str:
     """
@@ -276,6 +322,12 @@ def format_trading_signal_message(
                 lines.append(f"   🎯 Target: ${trade.get('profit_target', 0):.4f}")
                 lines.append(f"   🛡️ Stop Loss: ${trade.get('stop_loss', 0):.4f}")
                 lines.append(f"   ⚡ Leverage: {trade.get('leverage', 1)}x")
+                entry_fee = trade.get("fee", 0) or 0
+                if entry_fee:
+                    lines.append(f"   🧾 Fee (entry): ${entry_fee:.2f}")
+                net_entry = trade.get("net_pnl")
+                if net_entry not in (None, ""):
+                    lines.append(f"   📉 Net Impact: ${net_entry:.2f}")
                 lines.append(f"   💭 {reason}")
             elif action == "CLOSE":
                 emoji = "✅" if pnl > 0 else "❌"
@@ -283,6 +335,18 @@ def format_trading_signal_message(
                 lines.append(f"{emoji} <b>{action} {coin} {side}</b>")
                 lines.append(f"   💰 Price: ${price:.4f}")
                 lines.append(f"   {pnl_emoji} P&L: ${pnl:.2f}")
+                close_fee = trade.get("fee", 0) or 0
+                net_trade = trade.get("net_pnl")
+                if close_fee or net_trade not in (None, ""):
+                    fee_line = f"   🧾 Fee (exit): ${close_fee:.2f}"
+                    if net_trade not in (None, ""):
+                        fee_line += f" | Net This Trade: ${net_trade:.2f}"
+                    lines.append(fee_line)
+                position_net = trade.get("position_net_pnl")
+                if position_net not in (None, ""):
+                    lines.append(
+                        f"   📊 Position Net (incl. entry fees): ${position_net:.2f}"
+                    )
                 lines.append(f"   💭 {reason}")
             
             lines.append("")
@@ -332,6 +396,7 @@ def format_trading_signal_message(
     lines.append(f"💵 Total Equity: ${total_equity:.2f}")
     lines.append(f"📊 Total Return: {total_return_pct:+.2f}%")
     lines.append(f"💹 Unrealized P&L: ${net_unrealized_pnl:+.2f}")
+    lines.append(f"🧾 Fees Paid (lifetime): ${total_fees_paid:.2f}")
     lines.append(f"📍 Open Positions: {len(positions)}")
     
     if short_summary:

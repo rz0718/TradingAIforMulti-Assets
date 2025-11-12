@@ -29,9 +29,10 @@ TRADES_CSV = DATA_DIR / "trade_history.csv"
 DECISIONS_CSV = DATA_DIR / "ai_decisions.csv"
 MESSAGES_CSV = DATA_DIR / "ai_messages.csv"
 ENV_PATH = BASE_DIR / ".env"
-DEFAULT_RISK_FREE_RATE = 0.04
+DEFAULT_RISK_FREE_RATE = 0.05
 DEFAULT_SNAPSHOT_SECONDS = 300.0
 DEFAULT_START_CAPITAL = 10_000.0
+DEFAULT_TRADING_FEE_RATE = 0.0003
 
 COIN_TO_SYMBOL: Dict[str, str] = {
     "ETH": "ETHUSDT",
@@ -117,6 +118,32 @@ def resolve_risk_free_rate() -> float:
 RISK_FREE_RATE = resolve_risk_free_rate()
 STARTING_CAPITAL = resolve_starting_capital()
 
+
+def resolve_trading_fee_rate(default: float = DEFAULT_TRADING_FEE_RATE) -> float:
+    env_value = os.getenv("TRADING_FEE_RATE")
+    if not env_value:
+        return default
+    try:
+        fee_rate = float(env_value)
+    except (TypeError, ValueError):
+        logging.warning(
+            "Invalid TRADING_FEE_RATE value '%s'; using default %.6f",
+            env_value,
+            default,
+        )
+        return default
+    if fee_rate < 0:
+        logging.warning(
+            "Negative TRADING_FEE_RATE value '%s'; using default %.6f",
+            env_value,
+            default,
+        )
+        return default
+    return fee_rate
+
+
+TRADING_FEE_RATE = resolve_trading_fee_rate()
+
 BINANCE_CLIENT: Client | None = None
 if BN_API_KEY and BN_SECRET:
     try:
@@ -149,6 +176,7 @@ def get_portfolio_state(csv_path: str) -> pd.DataFrame:
         "total_margin",
         "net_unrealized_pnl",
         "sharpe_ratio",
+        "total_fees_paid",
     ]
     for col in numeric_cols:
         if col in df.columns:
@@ -164,6 +192,21 @@ def get_trades(csv_path: str) -> pd.DataFrame:
     df = load_csv(path, parse_dates=["timestamp"])
     if df.empty:
         return df
+    if {"net_pnl", "balance_after"}.issubset(df.columns):
+        net_numeric = pd.to_numeric(df["net_pnl"], errors="coerce")
+        balance_numeric = pd.to_numeric(df["balance_after"], errors="coerce")
+        misaligned_net = balance_numeric.isna() & net_numeric.notna() & df["balance_after"].isna()
+        if misaligned_net.any():
+            df.loc[misaligned_net, "balance_after"] = df.loc[misaligned_net, "net_pnl"]
+            df.loc[misaligned_net, "net_pnl"] = "0"
+    if {"fee", "reason"}.issubset(df.columns):
+        reason_missing = df["reason"].isna() | (df["reason"].astype(str).str.strip() == "")
+        fee_as_text = df["fee"].astype(str)
+        fee_numeric = pd.to_numeric(df["fee"], errors="coerce")
+        misaligned_fee = reason_missing & fee_numeric.isna() & (fee_as_text.str.strip() != "")
+        if misaligned_fee.any():
+            df.loc[misaligned_fee, "reason"] = df.loc[misaligned_fee, "fee"]
+            df.loc[misaligned_fee, "fee"] = ""
     df.sort_values("timestamp", inplace=True, ascending=False)
     numeric_cols = [
         "quantity",
@@ -173,7 +216,11 @@ def get_trades(csv_path: str) -> pd.DataFrame:
         "leverage",
         "confidence",
         "pnl",
+        "net_pnl",
+        "fee",
         "balance_after",
+        "position_fee_total",
+        "position_net_pnl",
     ]
     for col in numeric_cols:
         if col in df.columns:
@@ -271,6 +318,7 @@ def _parse_json_positions(data: Any) -> List[Dict[str, Any]] | None:
             "margin": _coerce_float(payload.get("margin")),
             "unrealized_pnl": _coerce_float(payload.get("unrealized_pnl")),
             "risk_usd": _coerce_float(payload.get("risk_usd")),
+            "fees_paid": _coerce_float(payload.get("fees_paid")),
             "justification": payload.get("justification", ""),
             "invalidation_condition": payload.get("invalidation_condition", ""),
         }
@@ -333,6 +381,7 @@ def parse_positions(position_payload: Any) -> pd.DataFrame:
         "margin",
         "unrealized_pnl",
         "risk_usd",
+        "fees_paid",
     )
     for col in numeric_cols:
         if col in df.columns:
@@ -619,6 +668,55 @@ def render_portfolio_tab(
         return
 
     latest = state_df.iloc[-1]
+    positions_df = parse_positions(latest.get("position_details", ""))
+    exit_fee_estimate = 0.0
+    price_map: Dict[str, float | None] = {}
+
+    if not positions_df.empty:
+        coins = positions_df.get("coin")
+        if coins is None:
+            coins = pd.Series([], dtype=object)
+        unique_coins = [coin for coin in coins.dropna().unique().tolist() if coin]
+        price_map = fetch_current_prices(unique_coins)
+        live_prices = coins.map(price_map)
+        if "current_price" in positions_df.columns:
+            positions_df["current_price"] = live_prices.combine_first(positions_df["current_price"])
+        else:
+            positions_df["current_price"] = live_prices
+        positions_df["current_price"] = pd.to_numeric(positions_df["current_price"], errors="coerce")
+        positions_df["current_price"] = positions_df["current_price"].fillna(positions_df["entry_price"])
+
+        def _row_unrealized(row: pd.Series) -> float | None:
+            price = row.get("current_price")
+            entry_price = row.get("entry_price")
+            quantity = row.get("quantity")
+            if quantity is None or pd.isna(quantity) or entry_price is None or pd.isna(entry_price):
+                return None
+            if price is None or pd.isna(price):
+                price = entry_price
+            diff = price - entry_price
+            if str(row.get("side", "")).lower() == "short":
+                diff = entry_price - price
+            return diff * quantity
+
+        positions_df["unrealized_pnl"] = positions_df.apply(_row_unrealized, axis=1)  # type: ignore[arg-type]
+        positions_df["fees_paid"] = pd.to_numeric(positions_df.get("fees_paid"), errors="coerce").fillna(0.0)
+
+        fee_rate = TRADING_FEE_RATE or 0.0
+        if fee_rate > 0:
+            price_for_exit = positions_df["current_price"].fillna(positions_df["entry_price"])
+            qty_abs = positions_df["quantity"].abs()
+            positions_df["estimated_exit_fee"] = qty_abs * price_for_exit * fee_rate
+            exit_fee_estimate = float(positions_df["estimated_exit_fee"].sum(skipna=True))
+            if not np.isfinite(exit_fee_estimate):
+                exit_fee_estimate = 0.0
+        else:
+            positions_df["estimated_exit_fee"] = 0.0
+
+    total_fees_paid = latest.get("total_fees_paid", 0.0)
+    if pd.isna(total_fees_paid):
+        total_fees_paid = 0.0
+    total_fees_paid = float(total_fees_paid)
     margin_allocated = latest.get("total_margin", 0.0)
     if pd.isna(margin_allocated):
         margin_allocated = 0.0
@@ -672,6 +770,13 @@ def render_portfolio_tab(
     col_h.metric(
         "Sortino Ratio",
         f"{sortino_ratio:,.2f}" if sortino_ratio is not None else "N/A",
+    )
+
+    fee_col_a, fee_col_b = st.columns(2)
+    fee_col_a.metric("Fees Paid (lifetime)", f"${total_fees_paid:,.2f}")
+    fee_col_b.metric("Est. Exit Fees (open positions)", f"${exit_fee_estimate:,.2f}")
+    st.caption(
+        f"Fee calculations assume {TRADING_FEE_RATE * 100:.3f}% per side; adjust the TRADING_FEE_RATE env var if needed."
     )
 
     portfolio_summary = latest.get("portfolio_summary")
@@ -797,24 +902,9 @@ def render_portfolio_tab(
         st.caption(btc_caption)
 
     st.subheader("Open Positions")
-    positions_df = parse_positions(latest.get("position_details", ""))
     if positions_df.empty:
         st.write("No open positions.")
     else:
-        price_map = fetch_current_prices(positions_df["coin"].unique().tolist())
-        positions_df["current_price"] = positions_df["coin"].map(price_map)
-
-        def _row_unrealized(row: pd.Series) -> float | None:
-            price = row.get("current_price")
-            if price is None or pd.isna(price):
-                return None
-            diff = price - row["entry_price"]
-            if str(row["side"]).lower() == "short":
-                diff = row["entry_price"] - price
-            return diff * row["quantity"]
-
-        positions_df["unrealized_pnl"] = positions_df.apply(_row_unrealized, axis=1)  # type: ignore
-
         if positions_df["current_price"].isna().all():
             st.caption("Live price lookup unavailable; showing entry data only.")
 
@@ -828,10 +918,92 @@ def render_portfolio_tab(
                 "stop_loss": st.column_config.NumberColumn(format="$%.4f"),
                 "margin": st.column_config.NumberColumn(format="$%.2f"),
                 "risk_usd": st.column_config.NumberColumn(format="$%.2f"),
+                "fees_paid": st.column_config.NumberColumn(format="$%.2f"),
                 "unrealized_pnl": st.column_config.NumberColumn(format="$%.2f"),
+                "estimated_exit_fee": st.column_config.NumberColumn(format="$%.2f"),
             },
             use_container_width=True,
         )
+
+
+def _extract_decision_justifications(messages_df: pd.DataFrame) -> pd.DataFrame:
+    """Parse assistant responses to recover per-coin justification text."""
+    if messages_df.empty or "content" not in messages_df.columns:
+        return pd.DataFrame(columns=["timestamp", "coin", "reasoning"])
+
+    assistant_df = messages_df[messages_df.get("role", "") == "assistant"].copy()
+    if assistant_df.empty:
+        return pd.DataFrame(columns=["timestamp", "coin", "reasoning"])
+
+    records: List[Dict[str, Any]] = []
+    for _, row in assistant_df.iterrows():
+        content = row.get("content")
+        if not isinstance(content, str) or not content.strip():
+            continue
+        try:
+            payload = json.loads(content)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        for coin, coin_payload in payload.items():
+            if not isinstance(coin_payload, dict):
+                continue
+            justification = coin_payload.get("justification")
+            if not justification:
+                continue
+            records.append(
+                {
+                    "timestamp": row.get("timestamp"),
+                    "coin": coin,
+                    "reasoning": justification,
+                }
+            )
+
+    if not records:
+        return pd.DataFrame(columns=["timestamp", "coin", "reasoning"])
+
+    df = pd.DataFrame(records)
+    df = df.dropna(subset=["timestamp", "coin", "reasoning"])
+    if df.empty:
+        return pd.DataFrame(columns=["timestamp", "coin", "reasoning"])
+    df.sort_values(["coin", "timestamp"], inplace=True)
+    return df
+
+
+def _merge_decisions_with_justifications(
+    decisions_df: pd.DataFrame, justifications_df: pd.DataFrame
+) -> pd.DataFrame:
+    """Merge decision rows with parsed justifications per coin."""
+    if decisions_df.empty or justifications_df.empty:
+        return decisions_df
+
+    merged_frames: List[pd.DataFrame] = []
+    for coin in sorted(decisions_df["coin"].dropna().unique()):
+        decisions_slice = decisions_df[decisions_df["coin"] == coin].sort_values("timestamp")
+        just_slice = justifications_df[justifications_df["coin"] == coin].sort_values("timestamp")
+        if just_slice.empty:
+            merged_frames.append(decisions_slice)
+            continue
+
+        merged = pd.merge_asof(
+            decisions_slice,
+            just_slice,
+            on="timestamp",
+            direction="backward",
+            tolerance=pd.Timedelta("5min"),
+        )
+
+        if "reasoning_y" in merged.columns:
+            merged["reasoning"] = merged["reasoning_x"].combine_first(merged["reasoning_y"])
+            merged.drop(columns=["reasoning_x", "reasoning_y"], inplace=True)
+        merged_frames.append(merged)
+
+    if not merged_frames:
+        return decisions_df
+
+    merged_decisions = pd.concat(merged_frames, ignore_index=True)
+    return merged_decisions
 
 
 def render_trades_tab(trades_df: pd.DataFrame) -> None:
@@ -848,7 +1020,11 @@ def render_trades_tab(trades_df: pd.DataFrame) -> None:
             "profit_target": st.column_config.NumberColumn(format="$%.4f"),
             "stop_loss": st.column_config.NumberColumn(format="$%.4f"),
             "pnl": st.column_config.NumberColumn(format="$%.2f"),
+            "net_pnl": st.column_config.NumberColumn(format="$%.2f"),
+            "fee": st.column_config.NumberColumn(format="$%.2f"),
             "balance_after": st.column_config.NumberColumn(format="$%.2f"),
+            "position_fee_total": st.column_config.NumberColumn(format="$%.2f"),
+            "position_net_pnl": st.column_config.NumberColumn(format="$%.2f"),
         },
         use_container_width=True,
         height=420,
@@ -863,8 +1039,15 @@ def render_ai_tab(decisions_df: pd.DataFrame, messages_df: pd.DataFrame) -> None
         if decisions_df.empty:
             st.write("No decisions yet.")
         else:
+            decisions_display = decisions_df.copy()
+            justifications = _extract_decision_justifications(messages_df)
+            if not justifications.empty:
+                merged = _merge_decisions_with_justifications(decisions_display, justifications)
+                decisions_display = merged.sort_values("timestamp", ascending=False).copy()
+            else:
+                decisions_display.sort_values("timestamp", ascending=False, inplace=True)
             st.dataframe(
-                decisions_df.head(50),
+                decisions_display.head(50),
                 column_config={
                     "timestamp": st.column_config.DatetimeColumn(format="YYYY-MM-DD HH:mm:ss"),
                     "confidence": st.column_config.NumberColumn(format="%.2f"),
