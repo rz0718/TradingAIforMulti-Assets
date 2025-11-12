@@ -9,10 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     TRADEBOT_DATA_DIR=/app/data
 
-# Prepare data directory for volume mounting
-RUN mkdir -p /app/data
-VOLUME ["/app/data"]
-
+    
 # Install system dependencies (including bash for the startup script)
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -20,8 +17,10 @@ RUN apt-get update && apt-get install -y \
     bash \
     && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /workspace
+
 # Copy requirements file
-COPY requirements.txt .
+COPY . .
 
 # Upgrade pip
 RUN pip install --upgrade pip
@@ -29,14 +28,13 @@ RUN pip install --upgrade pip
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your application code
-COPY . .
 
-# Make startup script executable
-RUN chmod +x start.sh
+# Make startup scripts executable
+RUN chmod +x start.sh docker-entrypoint.py
 
 # Expose Streamlit port
 EXPOSE 8501
 
-# Run both trading bot and dashboard
-CMD ["./start.sh"]
+# Set the entrypoint (use Python-based entrypoint for better reliability)
+ENTRYPOINT ["python3", "/workspace/docker-entrypoint.py"]
+
