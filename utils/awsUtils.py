@@ -87,7 +87,8 @@ class AWS:
         Raises:
             KeyError: If required credentials are not found in the JSON file.
         """
-        self.awsKey = json_parser(self.CONFIG["filePathAwsKey"])
+        # self.awsKey = json_parser(self.CONFIG["filePathAwsKey"])
+        self.awsKey = {}
         # initiate AWS client, to read object from s3
         self.storageOptions = {}
         for key in ["aws_access_key_id", "access_key_ID"]:
@@ -99,16 +100,12 @@ class AWS:
                 self.storageOptions["secret"] = self.awsKey[secret]
                 break
         self.awsClient = boto3.client(
-            "s3",
-            aws_access_key_id=self.storageOptions["key"],
-            aws_secret_access_key=self.storageOptions["secret"],
+            "s3"
         )
         # Create a Secrets Manager client
         self.awsSecretManagerClient = boto3.session.Session().client(
             service_name="secretsmanager",
             region_name=self.CONFIG["awsRegionName"],
-            aws_access_key_id=self.storageOptions["key"],
-            aws_secret_access_key=self.storageOptions["secret"],
         )
 
     def get_aws_secret_manager_value(self, key: str) -> dict:

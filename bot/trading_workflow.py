@@ -13,7 +13,8 @@ import numpy as np
 import pandas as pd
 from colorama import Fore, Style
 
-from . import clients, config, utils
+from . import clients, utils
+from config import config
 
 from openai import OpenAI
 

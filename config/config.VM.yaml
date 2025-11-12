@@ -10,6 +10,7 @@ kafka:
   #   topic:
   #     flowTardingHedgingOrders: flow-trading-order-request
   secretName: STAGING_KAFKA_CONFIG_NODE
+tradingBotSecretName: STAGING_TRADING_AI_BOT
 awsRegionName: ap-southeast-3
 filePathAwsKey: AWS_key.json
 slackAlert:
