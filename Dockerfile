@@ -25,6 +25,6 @@ RUN chmod +x start.sh docker-entrypoint.py
 # Expose Streamlit port
 EXPOSE 8501
 
-ENTRYPOINT ["python"]
+ENTRYPOINT ["/bin/bash"]
 
-CMD ["docker-entrypoint.py"]
+CMD ["start.sh"]
