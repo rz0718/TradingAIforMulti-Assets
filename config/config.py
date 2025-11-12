@@ -4,34 +4,12 @@ Configuration file for the Multi-LLM Trading Bot.
 """
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+from utils.utils import yaml_parser, json_parser
 
-# Load environment variables from .env file
-load_dotenv()
-
-# MONGO DB
-MONGO_DB_PATH = os.getenv("MONGO_DB_PATH", "")
-MONGO_DB_USERNAME = os.getenv("MONGO_DB_USERNAME", "")
-MONGO_DB_PASSWORD = os.getenv("MONGO_DB_PASSWORD", "")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "")
-
-ASSET_MODE = os.getenv("ASSET_MODE", "crypto")
 
 # --- DATA DIRECTORY ---
 DATA_DIR = Path(os.getenv("TRADEBOT_DATA_DIR", "data"))
 DATA_DIR.mkdir(exist_ok=True)
-
-# --- BINANCE API CONFIGURATION ---
-BN_API_KEY = os.getenv("BN_API_KEY", "")
-BN_SECRET = os.getenv("BN_SECRET", "")
-
-# --- OPENROUTER MULTI-LLM CONFIGURATION ---
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-
-# --- ALPACA API CONFIGURATION ---
-ALPACA_API_KEY = os.getenv("ALPACA_API_KEY", "")
-ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
 
 # Two LLM Models for Focused Testing (Claude Sonnet and Gemini Pro)
 LLM_MODELS = {
@@ -50,7 +28,63 @@ LLM_MODELS = {
         "temperature": 0.7,
     },
 }
-# --- TELEGRAM NOTIFICATIONS ---
+
+INTERVAL = "3m"  # 3-minute candles
+CHECK_INTERVAL = 3 * 60  # Check every 3 minutes (when candle closes)
+START_CAPITAL = 100000000 # 100000000 idr is 6k USD
+CAPITAL_PER_LLM = START_CAPITAL  # $10,000 per LLM (2 models total)
+
+# --- INDICATOR SETTINGS ---
+EMA_LEN = 20
+RSI_LEN = 14
+MACD_FAST = 12
+MACD_SLOW = 26
+MACD_SIGNAL = 9
+ATR_LEN = 14
+
+# --- RISK MANAGEMENT ---
+RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.05"))  # 5% annual risk-free rate
+MAX_POSITION_SIZE = 0.1  # Max 10% of capital per position
+STOP_LOSS_PCT = 0.02  # 2% stop loss
+PROFIT_TARGET_PCT = 0.04  # 4% profit target
+
+# --- TRADING RULES ---
+MIN_CONFIDENCE = 0.6  # Minimum confidence for trade execution
+MAX_LEVERAGE = 10  # Maximum leverage allowed
+MAX_DAILY_TRADES = 20  # Maximum trades per day per LLM
+
+globalConfigFilePath = "config/config.global.yaml"
+globalCONFIG = yaml_parser(globalConfigFilePath)
+filePathEnv = globalCONFIG["filePathEnv"]
+if os.path.isfile(filePathEnv):
+    env = json_parser(filePathEnv)["env"]
+else:
+    env = os.environ.get("env", globalCONFIG["VM_env"])
+
+
+envConfigFilePath = f"config/config.{env}.yaml"
+envCONFIG = yaml_parser(envConfigFilePath)
+
+# MONGO DB
+MONGO_DB_PATH = os.getenv("MONGO_DB_PATH", "")
+MONGO_DB_USERNAME = os.getenv("MONGO_DB_USERNAME", "")
+MONGO_DB_PASSWORD = os.getenv("MONGO_DB_PASSWORD", "")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "")
+
+ASSET_MODE = os.getenv("ASSET_MODE", "idss")
+
+# --- BINANCE API CONFIGURATION ---
+BN_API_KEY = os.getenv("BN_API_KEY", "")
+BN_SECRET = os.getenv("BN_SECRET", "")
+
+# --- OPENROUTER MULTI-LLM CONFIGURATION ---
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+# --- ALPACA API CONFIGURATION ---
+ALPACA_API_KEY = os.getenv("ALPACA_API_KEY", "")
+ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY", "")
+
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
@@ -94,29 +128,7 @@ elif ASSET_MODE.lower() == "us_stock":
         "SQQQ": "SQQQ",
         "UVIX": "UVIX",
     }
-INTERVAL = "3m"  # 3-minute candles
-CHECK_INTERVAL = 3 * 60  # Check every 3 minutes (when candle closes)
-START_CAPITAL = 100000000 # 100000000 idr is 6k USD
-CAPITAL_PER_LLM = START_CAPITAL  # $10,000 per LLM (2 models total)
 
-# --- INDICATOR SETTINGS ---
-EMA_LEN = 20
-RSI_LEN = 14
-MACD_FAST = 12
-MACD_SLOW = 26
-MACD_SIGNAL = 9
-ATR_LEN = 14
-
-# --- RISK MANAGEMENT ---
-RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.05"))  # 5% annual risk-free rate
-MAX_POSITION_SIZE = 0.1  # Max 10% of capital per position
-STOP_LOSS_PCT = 0.02  # 2% stop loss
-PROFIT_TARGET_PCT = 0.04  # 4% profit target
-
-# --- TRADING RULES ---
-MIN_CONFIDENCE = 0.6  # Minimum confidence for trade execution
-MAX_LEVERAGE = 10  # Maximum leverage allowed
-MAX_DAILY_TRADES = 20  # Maximum trades per day per LLM
 
 # --- LOGGING ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

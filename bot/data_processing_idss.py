@@ -6,7 +6,7 @@ import pandas as pd
 from pymongo import MongoClient, DESCENDING
 from pymongo.server_api import ServerApi
 
-from . import config
+from config import config
 from .indicators import *
 
 
