@@ -667,7 +667,7 @@ def run_trading_loop(model_name: str):
     state.load_state()
 
     logging.info("Initializing clients...")
-    if not clients.get_binance_client() or not clients.get_llm_client():
+    if not clients.get_llm_client():
         logging.critical("Failed to initialize required API clients. Exiting.")
         return
 

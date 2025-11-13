@@ -35,7 +35,7 @@ sleep 2
 echo "📊 Starting Dashboard..."
 cd front_end
 streamlit run dashboard.py \
-    --server.port=8501 \
+    --server.port=8081 \
     --server.address=0.0.0.0 \
     --server.headless=true \
     --browser.gatherUsageStats=false &
@@ -46,7 +46,7 @@ echo ""
 echo "======================================"
 echo "✅ All services running!"
 echo ""
-echo "📊 Dashboard: http://localhost:8501"
+echo "📊 Dashboard: http://localhost:8081"
 echo "📈 Trading Bot: Active"
 echo ""
 echo "Press Ctrl+C to stop all services"

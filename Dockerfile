@@ -20,10 +20,10 @@ RUN pip install -r requirements.txt
 
 
 # Make startup scripts executable
-RUN chmod +x start.sh docker-entrypoint.py
+RUN chmod +x start.sh
 
 # Expose Streamlit port
-EXPOSE 8501
+EXPOSE 8081
 
 ENTRYPOINT ["/bin/bash"]
 
