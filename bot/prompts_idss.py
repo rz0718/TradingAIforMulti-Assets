@@ -27,7 +27,7 @@ Your mission: Maximize risk-adjusted returns (PnL) through systematic, disciplin
 ## Market Parameters
 
 - **Exchange**: Indonesian Stock Exchange (IDX)
-- **Asset Universe**: Major Indonesian stocks (BBCA, GOTO, BYAN, BMRI, BBRI, TLKM, ASII, TPIA, BBNI, UNVR, HMSP)
+- **Asset Universe**: Major Indonesian stocks across various sectors
 - **Starting Capital**: Rp 100,000,000
 - **Market Hours**: 09:00 - 12:00 WIB (Session 1), 13:30 - 15:00 WIB (Session 2), Monday-Friday
 - **Decision Frequency**: Every 5 minutes during market hours (intraday trading)
