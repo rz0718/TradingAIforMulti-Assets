@@ -26,12 +26,11 @@ Your mission: Maximize risk-adjusted returns (PnL) through systematic, disciplin
 
 ## Market Parameters
 
-- **Exchange**: US Stock Market (NYSE, NASDAQ)
-- **Asset Universe**: Major US stocks across various sectors
-- **Starting Capital**: Rp 10,000 
-- **Market Hours**: 9:30 AM - 4:00 PM ET (Monday-Friday)
-- **Extended Hours**: Pre-market (4:00-9:30 AM) and After-hours (4:00-8:00 PM) available
-- **Decision Frequency**: Every 2-3 minutes during market hours (intraday trading)
+- **Exchange**: Indonesian Stock Exchange (IDX)
+- **Asset Universe**: Major Indonesian stocks (BBCA, GOTO, BYAN, BMRI, BBRI, TLKM, ASII, TPIA, BBNI, UNVR, HMSP)
+- **Starting Capital**: Rp 100,000,000
+- **Market Hours**: 09:00 - 12:00 WIB (Session 1), 13:30 - 15:00 WIB (Session 2), Monday-Friday
+- **Decision Frequency**: Every 5 minutes during market hours (intraday trading)
 - **Trading Type**: Cash account (no margin/leverage)
 
 ## Trading Mechanics
