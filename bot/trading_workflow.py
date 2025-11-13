@@ -42,9 +42,23 @@ class TradingState:
 
     def load_state(self):
         """Load persisted balance and positions if available."""
+        # Try to download from S3 first
+        s3_file_path = config.PROJECT_S3_PATH + "portfolio_state.json"
+        download_success = config.aws.download_from_s3(
+            s3_path=s3_file_path,
+            local_file_path=str(utils.STATE_JSON)
+        )
+        
+        if download_success:
+            logging.info("Successfully downloaded state from S3: %s", s3_file_path)
+        else:
+            logging.info("Could not download from S3, will check for local state file")
+        
+        # Check if local file exists (either downloaded or already present)
         if not utils.STATE_JSON.exists():
             logging.info("No existing state file found; starting fresh.")
             return
+            
         try:
             with open(utils.STATE_JSON, "r") as f:
                 data = json.load(f)
@@ -53,9 +67,10 @@ class TradingState:
             # Load positions if they exist
             if "positions" in data and isinstance(data["positions"], dict):
                 self.positions = data["positions"]
+                source = "S3" if download_success else "local file"
                 logging.info(
                     "Loaded state from %s (balance: %.2f, positions: %d)",
-                    utils.STATE_JSON,
+                    source,
                     self.balance,
                     len(self.positions)
                 )
@@ -70,9 +85,10 @@ class TradingState:
                         pos.get("leverage", 1)
                     )
             else:
+                source = "S3" if download_success else "local file"
                 logging.info(
                     "Loaded state from %s (balance: %.2f, no positions)", 
-                    utils.STATE_JSON, 
+                    source, 
                     self.balance
                 )
         except Exception as e:

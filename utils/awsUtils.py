@@ -192,6 +192,42 @@ class AWS:
             print(f"Error uploading to S3: {e}")
             return False
 
+    def download_from_s3(self, s3_path: str, local_file_path: str) -> bool:
+        """
+        Download a file from S3.
+        
+        Args:
+            s3_path (str): S3 path in format 's3://bucket-name/key/path' or 'bucket-name/key/path'
+            local_file_path (str): Local file path to save the downloaded file
+            
+        Returns:
+            bool: True if download successful, False otherwise
+        """
+        try:
+            # Parse S3 path
+            if s3_path.startswith('s3://'):
+                s3_path = s3_path[5:]  # Remove 's3://' prefix
+            
+            # Split bucket and key
+            parts = s3_path.split('/', 1)
+            bucket_name = parts[0]
+            s3_key = parts[1] if len(parts) > 1 else ''
+            
+            # Download file
+            self.awsClient.download_file(bucket_name, s3_key, local_file_path)
+            return True
+        except ClientError as e:
+            # Check if file doesn't exist (404)
+            error_code = e.response.get('Error', {}).get('Code', '')
+            if error_code == '404' or error_code == 'NoSuchKey':
+                print(f"File not found in S3: {s3_path}")
+            else:
+                print(f"Error downloading from S3: {e}")
+            return False
+        except Exception as e:
+            print(f"Error downloading from S3: {e}")
+            return False
+
     def centralizedAlert(
         self,
         slackChannelName,
