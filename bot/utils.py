@@ -10,7 +10,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
+import sys
 import requests
 
 from . import config
@@ -18,11 +18,38 @@ from . import config
 
 # --- LOGGING ---
 def setup_logging():
-    """Initializes basic logging configuration."""
-    logging.basicConfig(
-        format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO
+    """Initializes logging configuration with console output."""
+    # Create root logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+
+    # Remove any existing handlers
+    logger.handlers.clear()
+
+    # Create console handler with formatting
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+
+    # Create formatter
+    formatter = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
     )
-    logging.info("Logging configured.")
+    console_handler.setFormatter(formatter)
+
+    # Add handler to logger
+    logger.addHandler(console_handler)
+
+    # Optionally add file handler for persistent logs
+    try:
+        log_file = config.DATA_DIR / "trading_bot.log"
+        file_handler = logging.FileHandler(log_file, mode='a')
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        logging.info(f"Logging configured. Console + File output enabled ({log_file})")
+    except Exception as e:
+        logging.info(f"Logging configured. Console output enabled (File logging failed: {e})")
 
 
 # --- CSV & STATE MANAGEMENT ---

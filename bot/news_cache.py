@@ -67,9 +67,14 @@ def _save_cache(cache: Dict[str, Any]) -> None:
 
 def _build_default_queries() -> Dict[str, str]:
     queries: Dict[str, str] = {}
-    for symbol in config.SYMBOLS:
-        coin = config.SYMBOL_TO_COIN.get(symbol, symbol)
-        queries[coin] = f"{coin} cryptocurrency"
+    if config.ASSET_MODE.lower() == "crypto":
+        for symbol in config.SYMBOLS:
+            coin = config.SYMBOL_TO_COIN.get(symbol, symbol)
+            queries[coin] = f"{coin} cryptocurrency"
+    elif config.ASSET_MODE.lower() == "idss":
+        for symbol in config.SYMBOLS:
+            coin = config.SYMBOL_TO_COIN.get(symbol, symbol)
+            queries[coin] = f"{coin} Indonesia company news"
     return queries
 
 
@@ -100,6 +105,12 @@ def refresh_news_cache(
         start_date, end_date = _default_date_range()
 
     queries = asset_queries or _build_default_queries()
+    if config.ASSET_MODE.lower() == "idss":
+        country = "ID"
+        language = "id-ID"
+    else:
+        country = "US"
+        language = "en-US"
 
     cache = _load_cache()
     updated_cache: Dict[str, List[Dict[str, Any]]] = {}

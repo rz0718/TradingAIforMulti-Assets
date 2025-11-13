@@ -88,18 +88,51 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 NEWS_REFRESH_INTERVAL = int(os.getenv("NEWS_REFRESH_INTERVAL", str(3 * 60 * 60)))  # seconds
 
 # --- TRADING PARAMETERS ---
-SYMBOLS = ["ETHUSDT", "SOLUSDT", "XRPUSDT", "BTCUSDT", "DOGEUSDT", "BNBUSDT"]
-SYMBOL_TO_COIN = {
-    "ETHUSDT": "ETH",
-    "SOLUSDT": "SOL",
-    "XRPUSDT": "XRP",
-    "BTCUSDT": "BTC",
-    "DOGEUSDT": "DOGE",
-    "BNBUSDT": "BNB",
-}
+ASSET_MODE = os.getenv("ASSET_MODE", "idss")
+if ASSET_MODE.lower() == "crypto":
+    # --- TRADING PARAMETERS ---
+    SYMBOLS = ["ETHUSDT", "SOLUSDT", "XRPUSDT", "BTCUSDT", "DOGEUSDT", "BNBUSDT"]
+    SYMBOL_TO_COIN = {
+        "ETHUSDT": "ETH",
+        "SOLUSDT": "SOL",
+        "XRPUSDT": "XRP",
+        "BTCUSDT": "BTC",
+        "DOGEUSDT": "DOGE",
+        "BNBUSDT": "BNB",
+    }
+elif ASSET_MODE.lower() == "idss":
+    SYMBOLS = ["BBCA", "GOTO", "BYAN", "BMRI", "BBRI", "TLKM", "ASII", "TPIA", "BBNI", "UNVR", "HMSP"]
+    SYMBOL_TO_COIN = {
+        "BBCA": "BBCA",
+        "GOTO": "GOTO",
+        "BYAN": "BYAN",
+        "BMRI": "BMRI",
+        "BBRI": "BBRI",
+        "TLKM": "TLKM",
+        "ASII": "ASII",
+        "TPIA": "TPIA",
+        "BBNI": "BBNI",
+        "UNVR": "UNVR",
+        "HMSP": "HMSP",
+    }
+elif ASSET_MODE.lower() == "us_stock":
+    SYMBOLS = ["AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "NVDA", "IBIT", "TQQQ", "SQQQ", "UVIX"]
+    SYMBOL_TO_COIN = {
+        "AAPL": "AAPL",
+        "MSFT": "MSFT",
+        "GOOG": "GOOG",
+        "AMZN": "AMZN",
+        "TSLA": "TSLA",
+        "NVDA": "NVDA",
+        "IBIT": "IBIT",
+        "TQQQ": "TQQQ",
+        "SQQQ": "SQQQ",
+        "UVIX": "UVIX",
+    }
+
 INTERVAL = "5m"  # 5-minute candles
 CHECK_INTERVAL = 5 * 60  # Check every 5 minutes (when candle closes)
-START_CAPITAL = 10000.0
+START_CAPITAL = 100000000
 CAPITAL_PER_LLM = START_CAPITAL  # $10,000 per LLM (2 models total)
 
 # --- FEE & EXECUTION COSTS ---
