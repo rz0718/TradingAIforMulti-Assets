@@ -81,10 +81,23 @@ class TradingState:
     def save_state(self):
         """Persist current balance and open positions."""
         try:
+            # Save to local file
             with open(utils.STATE_JSON, "w") as f:
                 json.dump(
                     {"balance": self.balance, "positions": self.positions}, f, indent=2
                 )
+            
+            # Upload to S3
+            s3_file_path = config.PROJECT_S3_PATH + "portfolio_state.json"
+            upload_success = config.aws.upload_to_s3(
+                local_file_path=str(utils.STATE_JSON),
+                s3_path=s3_file_path
+            )
+            if upload_success:
+                logging.info("State saved locally and uploaded to S3: %s", s3_file_path)
+            else:
+                logging.warning("State saved locally but S3 upload failed")
+                
         except Exception as e:
             logging.error("Failed to save state: %s", e, exc_info=True)
 

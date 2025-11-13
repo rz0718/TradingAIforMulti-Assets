@@ -65,6 +65,7 @@ else:
 envConfigFilePath = f"config/config.{env}.yaml"
 envCONFIG = yaml_parser(envConfigFilePath)
 
+# AWS Utils
 from utils.awsUtils import AWS
 aws = AWS(env=env, configFilePath=f"config/config.{env}.yaml")
 
@@ -80,6 +81,7 @@ MONGO_APP_NAME = envCONFIG['mongo']["appName"]
 
 ASSET_MODE = os.getenv("ASSET_MODE", "idss")
 
+PROJECT_S3_PATH = envCONFIG['projectS3Path']
 AI_TRADING_BOT_CONFIG = aws.get_aws_secret_manager_value(key=envCONFIG['tradingBotSecretName'])
 
 # --- BINANCE API CONFIGURATION ---

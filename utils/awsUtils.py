@@ -164,6 +164,34 @@ class AWS:
         if d != {}:
             json_exporter(d, filePath)
 
+    def upload_to_s3(self, local_file_path: str, s3_path: str) -> bool:
+        """
+        Upload a file to S3.
+        
+        Args:
+            local_file_path (str): Local file path to upload
+            s3_path (str): S3 path in format 's3://bucket-name/key/path' or 'bucket-name/key/path'
+            
+        Returns:
+            bool: True if upload successful, False otherwise
+        """
+        try:
+            # Parse S3 path
+            if s3_path.startswith('s3://'):
+                s3_path = s3_path[5:]  # Remove 's3://' prefix
+            
+            # Split bucket and key
+            parts = s3_path.split('/', 1)
+            bucket_name = parts[0]
+            s3_key = parts[1] if len(parts) > 1 else ''
+            
+            # Upload file
+            self.awsClient.upload_file(local_file_path, bucket_name, s3_key)
+            return True
+        except Exception as e:
+            print(f"Error uploading to S3: {e}")
+            return False
+
     def centralizedAlert(
         self,
         slackChannelName,
