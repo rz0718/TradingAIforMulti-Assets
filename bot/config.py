@@ -21,54 +21,71 @@ BN_SECRET = os.getenv("BN_SECRET", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# --- OPENAI DIRECT ACCESS CONFIGURATION ---
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
 # Two LLM Models for Focused Testing (Claude Sonnet and Gemini Pro)
 LLM_MODELS = {
-    "deepseek_v3.1": {
-        "model_id": "deepseek/deepseek-chat-v3.1",
-        "name": "DeepSeek V3.1",
-        "provider": "DeepSeek",
-        "max_tokens": 4000,
-        "temperature": 0.7,
-    },
-    "qwen3_max": {
-        "model_id": "qwen/qwen3-max",
-        "name": "Qwen3 Max",
-        "provider": "Qwen",
-        "max_tokens": 4000,
-        "temperature": 0.7,
-    },
-    "gemini_pro": {
-        "model_id": "google/gemini-2.5-pro",
-        "name": "Gemini 2.5 Pro",
-        "provider": "Google",
-        "max_tokens": 4000,
-        "temperature": 0.7,
-    },
-    "grok4": {
-        "model_id": "x-ai/grok-4",
-        "name": "Grok 4",
-        "provider": "Grok",
-        "max_tokens": 4000,
-        "temperature": 0.7,
-    },
-    "gpt5": {
-        "model_id": "openai/gpt-5",
-        "name": "GPT-5",
-        "provider": "OpenAI",
-        "max_tokens": 4000,
-        "temperature": 0.7,
-    },
-    "claude_sonnet_4.5": {
-        "model_id": "anthropic/claude-sonnet-4.5",
-        "name": "Claude Sonnet 4.5",
-        "provider": "Anthropic",
-        "max_tokens": 4000,
+    # "deepseek_v3.1": {
+    #     "model_id": "deepseek/deepseek-chat-v3.1",
+    #     "name": "DeepSeek V3.1",
+    #     "provider": "DeepSeek",
+    #     "max_tokens": 10000,
+    #     "temperature": 0.7,
+    # },
+    # "qwen3_max": {
+    #     "model_id": "qwen/qwen3-max",
+    #     "name": "Qwen3 Max",
+    #     "provider": "Qwen",
+    #     "max_tokens": 10000,
+    #     "temperature": 0.7,
+    # },
+    # "gemini_pro": {
+    #     "model_id": "google/gemini-2.5-pro",
+    #     "name": "Gemini 2.5 Pro",
+    #     "provider": "Google",
+    #     "max_tokens": 10000,
+    #     "temperature": 0.7,
+    # },
+    # "grok4": {
+    #     "model_id": "x-ai/grok-4",
+    #     "name": "Grok 4",
+    #     "provider": "Grok",
+    #     "max_tokens": 10000,
+    #     "temperature": 0.7,
+    #     "reasoning": {"effort": "low"},
+    # },
+    # "gpt5": {
+    #     "model_id": "openai/gpt-5",
+    #     "name": "GPT-5",
+    #     "provider": "OpenAI",
+    #     "max_tokens": 10000,
+    #     "temperature": 1,
+    #     "reasoning": {"enabled": False},
+    #     "response_format": {"type": "json_object"},
+    # },
+    # "claude_sonnet_4.5": {
+    #     "model_id": "anthropic/claude-sonnet-4.5",
+    #     "name": "Claude Sonnet 4.5",
+    #     "provider": "Anthropic",
+    #     "max_tokens": 10000,
+    #     "temperature": 0.7,
+    # },
+    "kimi_k2": {
+        "model_id": "moonshotai/kimi-k2-thinking",
+        "name": "Kimik2",
+        "provider": "MoonshotAI",
+        "max_tokens": 10000,
         "temperature": 0.7,
     },
 }
 # --- TELEGRAM NOTIFICATIONS ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+# --- NEWS & FUNDAMENTALS ---
+NEWS_REFRESH_INTERVAL = int(os.getenv("NEWS_REFRESH_INTERVAL", str(3 * 60 * 60)))  # seconds
 
 # --- TRADING PARAMETERS ---
 SYMBOLS = ["ETHUSDT", "SOLUSDT", "XRPUSDT", "BTCUSDT", "DOGEUSDT", "BNBUSDT"]
@@ -84,6 +101,9 @@ INTERVAL = "5m"  # 5-minute candles
 CHECK_INTERVAL = 5 * 60  # Check every 5 minutes (when candle closes)
 START_CAPITAL = 10000.0
 CAPITAL_PER_LLM = START_CAPITAL  # $10,000 per LLM (2 models total)
+
+# --- FEE & EXECUTION COSTS ---
+TRADING_FEE_RATE = float(os.getenv("TRADING_FEE_RATE", "0.0003"))  # 0.03% per side by default
 
 # --- INDICATOR SETTINGS ---
 EMA_LEN = 20
