@@ -11,7 +11,7 @@ kafka:
   #     flowTardingHedgingOrders: flow-trading-order-request
   secretName: STAGING_KAFKA_CONFIG_NODE
 tradingBotSecretName: STAGING_TRADING_AI_BOT
-projectS3Path: s3://pluang-deployment-staging/appconfig/env/staging/trading-ai-multi-assets/
+projectS3Path: s3://trading-ai-multi-assets-staging/
 awsRegionName: ap-southeast-3
 filePathAwsKey: AWS_key.json
 slackAlert:
