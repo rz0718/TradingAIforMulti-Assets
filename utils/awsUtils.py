@@ -9,7 +9,7 @@ from utils.utils import json_parser, json_exporter, yaml_parser
 
 
 class AWS:
-    def __init__(self, env: str, configFilePath: str):
+    def __init__(self, env: str, configFilePath: str, secret_name: str):
 
         secretDict = {
             "VM": {
@@ -35,10 +35,18 @@ class AWS:
         self.secretMap = json_parser(f"/workspace/config/secret-map/{env}.json")
         self.cloud = "AWS"
         self.credentialViaAwsKey = env in ["VM", "development"]
-        if self.credentialViaAwsKey:
-            self.aws_client_init()
-        else:
+
+
+        if not self.credentialViaAwsKey:
             self.load_env_as_dict()
+        
+        AWS_SECRET_CONFIG = self.get_aws_secret_manager_value(key=secret_name)
+        AWS_ACCESS_KEY = AWS_SECRET_CONFIG.get("AWS_ACCESS_KEY", "")
+        AWS_SECRET_KEY = AWS_SECRET_CONFIG.get("AWS_SECRET_KEY", "")
+        
+        if AWS_ACCESS_KEY and AWS_SECRET_KEY:
+            self.aws_client_init(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+        
         self.slackChannelNameUrlDict = self.get_aws_secret_manager_value(
             secretDict[env]["slackChannelUrls"]
         )
@@ -78,7 +86,7 @@ class AWS:
             result[key] = try_eval_dict(value)
         self.envVariables = result
 
-    def aws_client_init(self):
+    def aws_client_init(self, aws_access_key: str = "", aws_secret_key: str = ""):
         """
         Initializes the AWS S3 client using credentials from a specified JSON file. This function
         extracts the necessary access key and secret key from the file, and sets up the S3 client
@@ -89,24 +97,28 @@ class AWS:
         """
         # self.awsKey = json_parser(self.CONFIG["filePathAwsKey"])
         self.awsKey = {}
-        # initiate AWS client, to read object from s3
-        self.storageOptions = {}
-        for key in ["aws_access_key_id", "access_key_ID"]:
-            if key in self.awsKey.keys():
-                self.storageOptions["key"] = self.awsKey[key]
-                break
-        for secret in ["aws_secret_access_key", "secret_access_key"]:
-            if secret in self.awsKey.keys():
-                self.storageOptions["secret"] = self.awsKey[secret]
-                break
-        self.awsClient = boto3.client(
-            "s3"
-        )
+        if aws_access_key:
+            self.awsKey["aws_access_key_id"] = aws_access_key
+        if aws_secret_key:
+            self.awsKey["aws_secret_access_key"] = aws_secret_key
+
+        # Build client kwargs - only add credentials if they exist
+        s3_client_kwargs = {}
+        secrets_client_kwargs = {
+            "service_name": "secretsmanager",
+            "region_name": self.CONFIG["awsRegionName"]
+        }
+        
+        # Only add credentials if both key and secret are provided
+        if aws_access_key and aws_secret_key:
+            s3_client_kwargs["aws_access_key_id"] = aws_access_key
+            s3_client_kwargs["aws_secret_access_key"] = aws_secret_key
+            secrets_client_kwargs["aws_access_key_id"] = aws_access_key
+            secrets_client_kwargs["aws_secret_access_key"] = aws_secret_key
+
+        self.awsClient = boto3.client("s3", **s3_client_kwargs)
         # Create a Secrets Manager client
-        self.awsSecretManagerClient = boto3.session.Session().client(
-            service_name="secretsmanager",
-            region_name=self.CONFIG["awsRegionName"],
-        )
+        self.awsSecretManagerClient = boto3.session.Session().client(**secrets_client_kwargs)
 
     def get_aws_secret_manager_value(self, key: str) -> dict:
         """fetch KAFKA AWS secret key from secret manager
