@@ -14,18 +14,21 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 from colorama import Fore, Style
-
-from . import clients, config, data_processing, utils
-from . import prompts_v1 as prompts
-
 from openai import OpenAI
 
+from config import config
+from . import clients
+from utils import utils
+
 if config.ASSET_MODE.lower() == "crypto":
-    from . import data_processing_crypto as data_processing
+    from . import data_processing as data_processing
     from . import prompts_v1 as prompts
 elif config.ASSET_MODE.lower() == "idss":
     from . import data_processing_idss as data_processing
     from . import prompts_idss as prompts
+else:
+    from . import data_processing as data_processing
+    from . import prompts as prompts
 
 
 def _to_float(value: Any) -> Optional[float]:
@@ -1062,8 +1065,16 @@ def run_trading_loop(model_name: str):
     state.load_state()
 
     logging.info("[%s] Initializing clients...", model_name)
-    if not clients.get_binance_client() or not clients.get_llm_client():
-        logging.critical("[%s] Failed to initialize required API clients. Exiting.", model_name)
+    
+    # Only check Binance client for crypto mode
+    if config.ASSET_MODE.lower() == "crypto":
+        if not clients.get_binance_client():
+            logging.critical("[%s] Failed to initialize Binance client. Exiting.", model_name)
+            return
+    
+    # LLM client is always required
+    if not clients.get_llm_client():
+        logging.critical("[%s] Failed to initialize LLM client. Exiting.", model_name)
         return
 
     logging.info("[%s] Starting capital: $%.2f", model_name, state.initial_capital)

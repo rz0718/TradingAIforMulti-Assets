@@ -15,12 +15,24 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-try:  # Support both package and standalone execution
-    from . import config  # type: ignore
+
+try:
+    from config import config  # type: ignore
+except ImportError:  # pragma: no cover - fallback when executed as script
+    import sys
+    from pathlib import Path
+
+    _PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    if str(_PROJECT_ROOT) not in sys.path:
+        sys.path.append(str(_PROJECT_ROOT))
+
+    from config import config  # type: ignore
+
+try:
     from .news_fetcher import search_google_news  # type: ignore
-except ImportError:  # pragma: no cover - fallback for direct invocation
-    import config  # type: ignore
+except ImportError:  # pragma: no cover - fallback for script execution
     from news_fetcher import search_google_news  # type: ignore
+
 
 logger = logging.getLogger(__name__)
 

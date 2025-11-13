@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from . import config, news_cache
+from config import config
+from . import news_cache
 
 
 # This is the system prompt

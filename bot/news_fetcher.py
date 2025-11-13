@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 
 try:  # Support both package and standalone execution
-    from . import config  # type: ignore
+    from config import config  # type: ignore
 except ImportError:  # pragma: no cover - fallback for direct invocation
     import config  # type: ignore
 

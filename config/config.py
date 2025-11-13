@@ -25,6 +25,11 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
+# --- LEGACY / DIRECT LLM FALLBACK ---
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "")
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gpt-4o")
+
 # Two LLM Models for Focused Testing (Claude Sonnet and Gemini Pro)
 LLM_MODELS = {
     # "deepseek_v3.1": {
@@ -84,6 +89,12 @@ LLM_MODELS = {
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
+# --- IDSS MONGODB CONFIGURATION ---
+MONGO_DB_USERNAME = os.getenv("MONGO_DB_USERNAME", "")
+MONGO_DB_PASSWORD = os.getenv("MONGO_DB_PASSWORD", "")
+MONGO_DB_HOST = os.getenv("MONGO_DB_HOST", "")
+MONGO_APP_NAME = os.getenv("MONGO_APP_NAME", "TradingAIforMultiAssets")
+
 # --- NEWS & FUNDAMENTALS ---
 NEWS_REFRESH_INTERVAL = int(os.getenv("NEWS_REFRESH_INTERVAL", str(3 * 60 * 60)))  # seconds
 
@@ -132,8 +143,8 @@ elif ASSET_MODE.lower() == "us_stock":
 
 INTERVAL = "5m"  # 5-minute candles
 CHECK_INTERVAL = 5 * 60  # Check every 5 minutes (when candle closes)
-START_CAPITAL = 100000000
-CAPITAL_PER_LLM = START_CAPITAL  # $10,000 per LLM (2 models total)
+START_CAPITAL = 100000000  # Rp 100,000,000 (~$6,500 USD) for IDSS mode
+CAPITAL_PER_LLM = START_CAPITAL  # Each LLM model gets full starting capital
 
 # --- FEE & EXECUTION COSTS ---
 TRADING_FEE_RATE = float(os.getenv("TRADING_FEE_RATE", "0.0003"))  # 0.03% per side by default
