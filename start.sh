@@ -55,4 +55,3 @@ echo ""
 
 # Wait for both processes
 wait
-
